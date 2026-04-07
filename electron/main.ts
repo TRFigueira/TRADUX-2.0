@@ -628,6 +628,22 @@ function initializeApp() {
   async function scanTranslatableFiles(gamePath: string): Promise<any[]> {
     const files: any[] = [];
     
+    // FILE BLACKLIST - Arquivos que NÃO contêm textos de jogo
+    const FILE_BLACKLIST = [
+      /^lib_/i,                    // lib_burst_generated, etc.
+      /^UnityEngine\./i,          // UnityEngine.CoreModule.dll, etc.
+      /^Unity\.Jobs\./i,         // Unity Jobs assemblies
+      /^System\./i,               // System assemblies
+      /^netstandard/i,            // .NET Standard
+      /^mscorlib/i,               // Core library
+      /^Mono\./i,                 // Mono runtime
+      /^Microsoft\./i,            // Microsoft assemblies
+      /Burst/i,                   // Burst compiler generated
+      /il2cpp/i,                  // IL2CPP generated files
+      /Assembly-CSharp-firstpass/i,
+      /Assembly-UnityScript/i,
+    ];
+    
     // Unity game text locations to prioritize
     const textLocations = [
       'StreamingAssets',      // Common for game data
@@ -681,6 +697,12 @@ function initializeApp() {
             item.match(/text/i) ||
             item.match(/string/i)
           ) {
+            // Check blacklist - skip system files
+            if (FILE_BLACKLIST.some(pattern => pattern.test(item))) {
+              console.log(`[Scan] Ignorado (blacklist): ${item}`);
+              continue;
+            }
+            
             try {
               const stats = fs.statSync(fullPath);
               
@@ -922,13 +944,57 @@ function initializeApp() {
     const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
     if (letterCount < 3) return false;
     
+    // ===== ENHANCED FILTERS - Exclude code/metadata =====
+    
+    // Skip if looks like C++ method signature (::)
+    if (text.includes('::')) return false;
+    
+    // Skip if looks like C# method call (NameSpace.Class.Method)
+    if (/\w+\.\w+\.\w+/.test(text) && text.includes('(')) return false;
+    
+    // Skip Unity/System namespaces
+    if (text.startsWith('UnityEngine.')) return false;
+    if (text.startsWith('Unity.')) return false;
+    if (text.startsWith('System.')) return false;
+    if (text.startsWith('Mono.')) return false;
+    
+    // Skip assembly metadata
+    if (text.includes('PublicKeyToken=')) return false;
+    if (text.includes('mscorlib')) return false;
+    if (text.includes('Version=') && text.includes('Culture=')) return false;
+    if (text.includes('Version=') && text.includes('PublicKeyToken=')) return false;
+    
+    // Skip Burst/IL2CPP internals
+    if (text.includes('BurstGenerated')) return false;
+    if (text.includes('CalcVertex') || text.includes('CalcTriangle') || text.includes('CalcNormal')) return false;
+    if (text.includes('JobParallelFor')) return false;
+    if (text.includes('JobRanges')) return false;
+    
+    // Skip hash/ID patterns
+    if (/^[0-9a-f]{16,}$/i.test(text)) return false; // Long hex strings
+    if (/\b[0-9a-f]{8}-[0-9a-f]{4}/i.test(text)) return false; // GUID fragments
+    
+    // Skip variable names (camelCase/PascalCase without spaces)
+    if (/^[A-Z][a-z]+[A-Z]/.test(text) && !text.includes(' ')) return false;
+    if (/^[a-z]+[A-Z]/.test(text) && !text.includes(' ')) return false;
+    
+    // Skip if too many dots (likely namespace path)
+    const dotCount = (text.match(/\./g) || []).length;
+    if (dotCount > 3 && letterCount < 20) return false;
+    
+    // Skip if no spaces at all (likely a single identifier)
+    if (!text.includes(' ') && letterCount < 15) return false;
+    
+    // Skip if mostly non-alphabetic (binary or encoded)
+    const nonAlphaRatio = (text.length - letterCount) / text.length;
+    if (nonAlphaRatio > 0.5) return false;
+    
     // Skip if looks like code/technical
     if (text.includes('m_') && text.includes('_')) return false; // Unity variable names
     if (/^[0-9a-fA-F]{8,}$/.test(text)) return false; // Hex strings
-    if (/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(text) && text.length < 20) return false; // Variable names
-    if (text.includes('::') || text.includes('->')) return false; // C++ code
+    if (/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(text) && text.length < 20) return false; // variable names
+    if (text.includes('->')) return false; // C++ pointer
     if (text.startsWith('k__') || text.startsWith('<>')) return false; // Compiler generated
-    if (text.includes('UnityEngine') || text.includes('System.')) return false; // .NET namespaces
     if (text.includes('Assembly') || text.includes('Version=')) return false; // Assembly info
     if (text.endsWith('.dll') || text.endsWith('.cs')) return false; // File references
     
@@ -949,7 +1015,10 @@ function initializeApp() {
                                   text.includes('Hello') ||
                                   text.includes('Welcome') ||
                                   text.includes('Click') ||
-                                  text.includes('Press');
+                                  text.includes('Press') ||
+                                  text.includes(' to ') ||
+                                  text.includes(' a ') ||
+                                  text.includes(' is ');
     
     if (!hasSentenceStructure && letterCount < 15) return false;
     
