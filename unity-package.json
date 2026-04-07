@@ -1,0 +1,30 @@
+{
+  "name": "com.trf.tradux",
+  "version": "2.0.0",
+  "displayName": "TRADUX Translation Tool",
+  "description": "Advanced CAT tool for Unity game translation with automated extraction and intelligent translation features",
+  "unity": "2021.3",
+  "unityRelease": "0f1",
+  "documentationUrl": "https://github.com/TRFigueira/TRADUX-2.0",
+  "changelogUrl": "https://github.com/TRFigueira/TRADUX-2.0/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/TRFigueira/TRADUX-2.0/blob/main/LICENSE",
+  "keywords": [
+    "translation",
+    "localization",
+    "cat",
+    "unity",
+    "games",
+    "i18n",
+    "tradux"
+  ],
+  "author": {
+    "name": "TRFigueira",
+    "email": "contact@tradux.dev",
+    "url": "https://github.com/TRFigueira"
+  },
+  "type": "tool",
+  "hideInEditor": false,
+  "testables": [
+    "com.trf.tradux"
+  ]
+}
