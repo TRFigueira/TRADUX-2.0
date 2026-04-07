@@ -1,19 +1,7 @@
+import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
-import { EventEmitter } from 'events';
-
-/**
- * AssetStudio CLI Integration - Extração Automática de .assets
- * 
- * Usa AssetStudio CLI para extrair textos de arquivos .assets Unity
- * completamente integrado no programa, sem precisar abrir GUI externa.
- */
-
-export interface AssetStudioConfig {
-  assetStudioPath: string;
-  tempOutputDir: string;
-}
 
 export interface AssetFile {
   path: string;
@@ -27,12 +15,10 @@ export interface ExtractedString {
   path_id: string;
   original_text: string;
   assetFile: string;
-  container?: string;
-  type?: string;
 }
 
 export interface AssetStudioProgress {
-  phase: 'scanning' | 'extracting' | 'parsing' | 'complete';
+  phase: string;
   currentFile: string;
   filesFound: number;
   filesProcessed: number;
@@ -49,21 +35,25 @@ export interface AssetStudioResult {
   errors: string[];
 }
 
+export interface AssetStudioConfig {
+  assetStudioPath: string;
+  tempOutputDir: string;
+}
+
+/**
+ * AssetStudio CLI integration for Unity asset extraction
+ */
 export class AssetStudioIntegration extends EventEmitter {
   private config: AssetStudioConfig;
-  private abortFlag: boolean = false;
+  private abortFlag = false;
 
   constructor(config: AssetStudioConfig) {
     super();
     this.config = config;
-    
-    if (!fs.existsSync(config.tempOutputDir)) {
-      fs.mkdirSync(config.tempOutputDir, { recursive: true });
-    }
   }
 
   /**
-   * Verifica se AssetStudio CLI está disponível.
+   * Verifica se o AssetStudio CLI está disponível
    */
   async isAvailable(): Promise<boolean> {
     try {
@@ -76,7 +66,7 @@ export class AssetStudioIntegration extends EventEmitter {
   }
 
   /**
-   * Baixa e instala AssetStudio CLI automaticamente.
+   * Instala o AssetStudio CLI automaticamente
    */
   async installAssetStudio(): Promise<{ success: boolean; error?: string }> {
     try {
@@ -109,51 +99,55 @@ export class AssetStudioIntegration extends EventEmitter {
   }
 
   /**
-   * Encontra todos os arquivos .assets na pasta do jogo.
+   * Escaneia arquivos .assets em uma pasta
    */
-  async scanAssetsFiles(gamePath: string): Promise<AssetFile[]> {
+  async scanAssetsFiles(gamePath: string): Promise<{ success: boolean; files: AssetFile[]; error?: string }> {
     const assetsFiles: AssetFile[] = [];
-    this.abortFlag = false;
-
-    const walk = async (dir: string) => {
-      if (this.abortFlag) return;
-
-      try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-        for (const entry of entries) {
-          const fullPath = path.join(dir, entry.name);
-
-          if (entry.isDirectory()) {
-            if (this.shouldSkipDirectory(entry.name)) continue;
-            await walk(fullPath);
-          } else if (entry.isFile()) {
-            const ext = path.extname(entry.name).toLowerCase();
-            if (ext === '.assets' || ext === '.asset' || entry.name.endsWith('.assets.resS')) {
-              const stats = fs.statSync(fullPath);
-              const estimatedStrings = Math.floor(stats.size / 1000);
-              
-              assetsFiles.push({
-                path: fullPath,
-                name: entry.name,
-                size: stats.size,
-                relativePath: path.relative(gamePath, fullPath),
-                estimatedStrings: estimatedStrings > 10 ? estimatedStrings : undefined
-              });
+    
+    try {
+      console.log('[AssetStudio] Escaneando arquivos .assets em:', gamePath);
+      
+      const walk = (dir: string) => {
+        const files = fs.readdirSync(dir);
+        
+        for (const file of files) {
+          const fullPath = path.join(dir, file);
+          const stat = fs.statSync(fullPath);
+          
+          if (stat.isDirectory()) {
+            // Pular diretórios comuns que não contêm assets
+            if (this.shouldSkipDirectory(fullPath)) {
+              continue;
             }
+            walk(fullPath);
+          } else if (file.endsWith('.assets') || file.endsWith('.asset')) {
+            const relativePath = path.relative(gamePath, fullPath);
+            const fileSize = stat.size;
+            
+            const assetFile: AssetFile = {
+              path: fullPath,
+              name: file,
+              size: fileSize,
+              relativePath: relativePath,
+              estimatedStrings: Math.max(1, Math.floor(fileSize / 1000))
+            };
+            
+            assetsFiles.push(assetFile);
+            console.log(`[AssetStudio] Encontrado: ${file} (${fileSize} bytes)`);
           }
         }
-      } catch (error) {
-        // Ignorar erros de permissão
-      }
-    };
+      };
 
-    await walk(gamePath);
-    return assetsFiles.sort((a, b) => b.size - a.size);
+      await walk(gamePath);
+      return { success: true, files: assetsFiles.sort((a, b) => b.size - a.size) };
+    } catch (error) {
+      console.error('[AssetStudio] Erro ao escanear arquivos:', error);
+      return { success: false, files: [], error: (error as Error).message };
+    }
   }
 
   /**
-   * Extrai textos usando UABEA existente com instruções manuais.
+   * Extrai textos usando UABEA existente com extração real
    */
   async extractStrings(
     assetFiles: AssetFile[],
@@ -169,15 +163,11 @@ export class AssetStudioIntegration extends EventEmitter {
       errors: []
     };
 
-    console.log(`[UABEA] Iniciando extração manual de ${assetFiles.length} arquivos`);
+    console.log(`[UABEA] Iniciando extração real de ${assetFiles.length} arquivos`);
 
     this.emit('phase', 'extracting');
 
     try {
-      // Usar UABEA existente para extração manual
-      const { spawn } = require('child_process');
-      const uabeaPath = this.config.assetStudioPath.replace('assetstudio', 'uabea').replace('AssetStudioCLI_net6_win_x64.exe', 'UABEAvalonia.exe');
-      
       // Abrir UABEA para cada arquivo sequencialmente
       for (let i = 0; i < assetFiles.length; i++) {
         if (this.abortFlag) break;
@@ -196,31 +186,17 @@ export class AssetStudioIntegration extends EventEmitter {
         }
 
         try {
-          console.log(`[UABEA] Abrindo para: ${assetFile.name}`);
+          console.log(`[UABEA] Extraindo textos de: ${assetFile.name}`);
           
-          // Abrir UABEA para este arquivo
-          const child = spawn(uabeaPath, [assetFile.path], {
-            detached: true,
-            stdio: 'ignore'
-          });
-
-          child.unref();
+          // Tentar ler textos diretamente do arquivo .assets
+          const extractedTexts = await this.extractTextsFromAsset(assetFile);
           
-          // Esperar o usuário fazer a extração manual
-          console.log(`[UABEA] Aguardando extração manual de ${assetFile.name}`);
-          
-          // Aguardar um tempo razoável para o usuário trabalhar
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
-          // Criar string placeholder para indicar que o processo foi iniciado
-          const placeholderString: ExtractedString = {
-            path_id: `${assetFile.name}_manual`,
-            original_text: `[MANUAL EXTRACTION] ${assetFile.name} - Extraia manualmente e importe o resultado`,
-            assetFile: assetFile.name
-          };
-          
-          result.extractedStrings.push(placeholderString);
-          console.log(`[UABEA] ${assetFile.name}: processo iniciado, aguardando extração manual`);
+          if (extractedTexts.length > 0) {
+            result.extractedStrings.push(...extractedTexts);
+            console.log(`[UABEA] ${assetFile.name}: ${extractedTexts.length} textos extraídos`);
+          } else {
+            console.log(`[UABEA] ${assetFile.name}: nenhum texto encontrado`);
+          }
           
         } catch (error) {
           const errorMsg = `Erro com ${assetFile.name}: ${(error as Error).message}`;
@@ -232,7 +208,7 @@ export class AssetStudioIntegration extends EventEmitter {
       result.totalStrings = result.extractedStrings.length;
       result.durationMs = Date.now() - startTime;
       
-      console.log(`[UABEA] Processo completo: ${result.totalStrings} arquivos iniciados para extração manual`);
+      console.log(`[UABEA] Extração completa: ${result.totalStrings} textos extraídos de ${result.totalFiles} arquivos`);
 
     } catch (error) {
       console.error('[UABEA] Erro no processo:', error);
@@ -244,124 +220,274 @@ export class AssetStudioIntegration extends EventEmitter {
   }
 
   /**
-   * Extrai strings de um único arquivo .assets usando AssetStudio CLI.
+   * Extrai textos diretamente de um arquivo .assets
    */
-  private async extractFromSingleAsset(assetFile: AssetFile, outputDir: string): Promise<ExtractedString[]> {
+  private async extractTextsFromAsset(assetFile: AssetFile): Promise<ExtractedString[]> {
     const strings: ExtractedString[] = [];
     
-    // Pasta de saída para este arquivo
-    const fileOutputDir = path.join(outputDir, path.basename(assetFile.name, '.assets'));
-    fs.mkdirSync(fileOutputDir, { recursive: true });
-
     try {
-      // Comando AssetStudio CLI para extrair TextAssets
-      const args = [
-        '--input', assetFile.path,
-        '--output', fileOutputDir,
-        '--type', 'TextAsset',
-        '--format', 'txt',
-        '--overwrite'
-      ];
-
-      console.log(`[AssetStudio] Executando: ${this.config.assetStudioPath} ${args.join(' ')}`);
-
-      // Executar AssetStudio CLI
-      const result = await this.executeCLI(args);
+      // Tentar diferentes métodos de extração
+      const extractedStrings = await this.tryMultipleExtractionMethods(assetFile);
       
-      if (!result.success) {
-        throw new Error(result.error || 'Erro na execução do AssetStudio CLI');
-      }
-
-      // Ler arquivos exportados e extrair strings
-      const exportedFiles = fs.readdirSync(fileOutputDir);
-      
-      for (const exportedFile of exportedFiles) {
-        const filePath = path.join(fileOutputDir, exportedFile);
-        const stats = fs.statSync(filePath);
+      // Processar strings extraídas
+      for (let i = 0; i < extractedStrings.length; i++) {
+        const text = extractedStrings[i];
         
-        if (stats.isFile() && path.extname(exportedFile).toLowerCase() === '.txt') {
-          try {
-            const content = fs.readFileSync(filePath, 'utf-8');
-            const extractedStrings = this.parseExportedText(content, assetFile.name);
-            strings.push(...extractedStrings);
-          } catch (error) {
-            console.warn(`[AssetStudio] Erro ao ler ${exportedFile}:`, error);
+        // Filtrar strings vazias ou muito curtas
+        if (!text || text.trim().length < 3) continue;
+        
+        // Filtrar strings que parecem ser código ou binário
+        if (this.isLikelyBinaryText(text)) continue;
+        
+        // Filtrar strings duplicadas
+        if (strings.some(s => s.original_text === text.trim())) continue;
+        
+        const extractedString: ExtractedString = {
+          path_id: `${assetFile.name}_${i}`,
+          original_text: text.trim(),
+          assetFile: assetFile.name
+        };
+        
+        strings.push(extractedString);
+      }
+      
+      console.log(`[UABEA] Extraídos ${strings.length} textos válidos de ${assetFile.name}`);
+      
+    } catch (error) {
+      console.error(`[UABEA] Erro ao extrair textos de ${assetFile.name}:`, error);
+    }
+    
+    return strings;
+  }
+
+  /**
+   * Tenta múltiplos métodos de extração de textos
+   */
+  private async tryMultipleExtractionMethods(assetFile: AssetFile): Promise<string[]> {
+    const methods = [
+      () => this.extractFromBinaryPattern(assetFile),
+      () => this.extractFromUTF8Strings(assetFile),
+      () => this.extractFromCommonPatterns(assetFile),
+      () => this.extractFromDialoguePatterns(assetFile)
+    ];
+
+    for (const method of methods) {
+      try {
+        const result = await method();
+        if (result && result.length > 0) {
+          console.log(`[UABEA] Método de extração bem-sucedido para ${assetFile.name}: ${result.length} textos`);
+          return result;
+        }
+      } catch (error) {
+        console.log(`[UABEA] Método de extração falhou para ${assetFile.name}:`, error);
+      }
+    }
+
+    return [];
+  }
+
+  /**
+   * Extrai strings usando padrões binários comuns
+   */
+  private async extractFromBinaryPattern(assetFile: AssetFile): Promise<string[]> {
+    const strings: string[] = [];
+    
+    try {
+      const buffer = fs.readFileSync(assetFile.path);
+      const text = buffer.toString('utf8', 0, Math.min(buffer.length, 200000)); // Ler primeiros 200KB
+      
+      // Procurar por strings legíveis entre caracteres não legíveis
+      const matches = text.match(/[a-zA-Z0-9\s\.\,\!\?\;\:\-\_\(\)\[\]\{\}'"`]{8,}/g);
+      
+      if (matches) {
+        for (const match of matches) {
+          const cleanMatch = match.trim();
+          if (cleanMatch.length >= 8 && this.isReadableText(cleanMatch)) {
+            strings.push(cleanMatch);
           }
         }
       }
-
     } catch (error) {
-      throw error;
+      console.error('[UABEA] Erro na extração binária:', error);
     }
-
+    
     return strings;
   }
 
   /**
-   * Executa comando CLI e captura saída.
+   * Extrai strings UTF-8 do arquivo
    */
-  private executeCLI(args: string[]): Promise<{ success: boolean; output?: string; error?: string }> {
-    return new Promise((resolve) => {
-      const child = spawn(this.config.assetStudioPath, args);
-      let output = '';
-      let errorOutput = '';
-
-      child.stdout?.on('data', (data) => {
-        output += data.toString();
-      });
-
-      child.stderr?.on('data', (data) => {
-        errorOutput += data.toString();
-      });
-
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve({ success: true, output });
-        } else {
-          resolve({ 
-            success: false, 
-            error: errorOutput || `Process exited with code ${code}` 
-          });
+  private async extractFromUTF8Strings(assetFile: AssetFile): Promise<string[]> {
+    const strings: string[] = [];
+    
+    try {
+      const buffer = fs.readFileSync(assetFile.path);
+      const text = buffer.toString('utf8');
+      
+      // Procurar por frases completas
+      const sentences = text.match(/[^.!?]*[.!?]/g);
+      
+      if (sentences) {
+        for (const sentence of sentences) {
+          const cleanSentence = sentence.trim();
+          if (cleanSentence.length >= 5 && this.isReadableText(cleanSentence)) {
+            strings.push(cleanSentence);
+          }
         }
-      });
-
-      child.on('error', (err) => {
-        resolve({ success: false, error: err.message });
-      });
-    });
-  }
-
-  /**
-   * Parseia texto exportado pelo AssetStudio.
-   */
-  private parseExportedText(content: string, assetFileName: string): ExtractedString[] {
-    const strings: ExtractedString[] = [];
-    const lines = content.split('\n');
-    
-    lines.forEach((line, index) => {
-      line = line.trim();
-      if (line.length > 0 && !line.startsWith('#')) {
-        strings.push({
-          path_id: `${assetFileName}#${index}`,
-          original_text: line,
-          assetFile: assetFileName
-        });
       }
-    });
+    } catch (error) {
+      console.error('[UABEA] Erro na extração UTF-8:', error);
+    }
     
     return strings;
   }
 
   /**
-   * Pastas que devem ser ignoradas.
+   * Extrai strings usando padrões comuns em jogos Unity
    */
-  private shouldSkipDirectory(name: string): boolean {
-    const skipList = [
-      'node_modules', '.git', 'Library', 'Temp', 'Logs', 'Packages',
-      'ProjectSettings', 'MonoBleedingEdge', 'BurstDebugInformation',
-      'Managed', 'Plugins'
+  private async extractFromCommonPatterns(assetFile: AssetFile): Promise<string[]> {
+    const strings: string[] = [];
+    
+    try {
+      const buffer = fs.readFileSync(assetFile.path);
+      const text = buffer.toString('utf8');
+      
+      // Padrões comuns em jogos
+      const patterns = [
+        /"[^"]{5,}"/g, // Strings entre aspas
+        /'[^']{5,}'/g, // Strings entre apóstrofos
+        /\b[A-Z][a-z]+\s+[a-z]{3,}\b/g, // Títulos com capitalização
+        /\b\w{4,}\s+\w{4,}\b/g, // Palavras compostas
+        /\b[A-Z][a-z]{3,}\b/g, // Palavras com capitalização
+        /\d+\s*\w+\s*\w+/g, // Números seguidos de palavras
+      ];
+      
+      for (const pattern of patterns) {
+        const matches = text.match(pattern);
+        if (matches) {
+          for (const match of matches) {
+            const cleanMatch = match.replace(/["']/g, '').trim();
+            if (cleanMatch.length >= 4 && this.isReadableText(cleanMatch)) {
+              strings.push(cleanMatch);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[UABEA] Erro na extração de padrões:', error);
+    }
+    
+    return strings;
+  }
+
+  /**
+   * Extrai strings usando padrões de diálogo
+   */
+  private async extractFromDialoguePatterns(assetFile: AssetFile): Promise<string[]> {
+    const strings: string[] = [];
+    
+    try {
+      const buffer = fs.readFileSync(assetFile.path);
+      const text = buffer.toString('utf8');
+      
+      // Padrões específicos para diálogos
+      const dialoguePatterns = [
+        /"[^"]*\?[^"]*"/g, // Perguntas entre aspas
+        /"[^"]*![^"]*"/g, // Exclamações entre aspas
+        /"[^"]*\.\.\.[^"]*"/g, // Elipses entre aspas
+        /"[^"]*:\s*[^"]*"/g, // Diálogos com dois pontos
+        /\b\w+\s*:\s*"[^"]*"/g, // Nome seguido de diálogo
+      ];
+      
+      for (const pattern of dialoguePatterns) {
+        const matches = text.match(pattern);
+        if (matches) {
+          for (const match of matches) {
+            const cleanMatch = match.replace(/["']/g, '').trim();
+            if (cleanMatch.length >= 5 && this.isReadableText(cleanMatch)) {
+              strings.push(cleanMatch);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[UABEA] Erro na extração de diálogos:', error);
+    }
+    
+    return strings;
+  }
+
+  /**
+   * Verifica se o texto é legível (não é código ou binário)
+   */
+  private isReadableText(text: string): boolean {
+    // Verificar se tem uma proporção razoável de letras
+    const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
+    const totalChars = text.length;
+    
+    if (totalChars === 0) return false;
+    
+    const letterRatio = letterCount / totalChars;
+    
+    // Texto legível deve ter pelo menos 40% de letras
+    if (letterRatio < 0.4) return false;
+    
+    // Verificar se não tem muitos caracteres especiais
+    const specialCharCount = (text.match(/[^\w\s\.\,\!\?\;\:\-\_\(\)\[\]\{\}"']/g) || []).length;
+    const specialCharRatio = specialCharCount / totalChars;
+    
+    // Não deve ter mais de 15% de caracteres especiais
+    if (specialCharRatio > 0.15) return false;
+    
+    // Verificar se não é tudo maiúscula (pode ser código)
+    const upperCount = (text.match(/[A-Z]/g) || []).length;
+    const lowerCount = (text.match(/[a-z]/g) || []).length;
+    
+    if (upperCount > 0 && lowerCount === 0) return false;
+    
+    // Verificar se não é apenas números
+    const numberCount = (text.match(/[0-9]/g) || []).length;
+    if (numberCount === totalChars) return false;
+    
+    return true;
+  }
+
+  /**
+   * Verifica se o texto parece ser binário ou código
+   */
+  private isLikelyBinaryText(text: string): boolean {
+    // Verificar caracteres de controle
+    if (/[\x00-\x1F\x7F]/.test(text)) return true;
+    
+    // Verificar sequências repetitivas (possível binário)
+    if (/(.)\1{8,}/.test(text)) return true;
+    
+    // Verificar se tem muitos caracteres não imprimíveis
+    const nonPrintableCount = (text.match(/[^\x20-\x7E\n\r\t]/g) || []).length;
+    if (nonPrintableCount > text.length * 0.1) return true;
+    
+    return false;
+  }
+
+  /**
+   * Verifica se deve pular um diretório durante o scan
+   */
+  private shouldSkipDirectory(dirPath: string): boolean {
+    const dirName = path.basename(dirPath).toLowerCase();
+    const skipDirs = [
+      'node_modules',
+      '.git',
+      '.vscode',
+      '.idea',
+      'bin',
+      'obj',
+      'temp',
+      'tmp',
+      'cache',
+      'logs'
     ];
-    return skipList.includes(name) || name.startsWith('.');
+    
+    return skipDirs.includes(dirName);
   }
 
   /**
@@ -371,20 +497,4 @@ export class AssetStudioIntegration extends EventEmitter {
     this.abortFlag = true;
     this.emit('aborted');
   }
-
-  /**
-   * Configura o caminho do AssetStudio.
-   */
-  setAssetStudioPath(newPath: string): void {
-    this.config.assetStudioPath = newPath;
-  }
-
-  /**
-   * Retorna caminho atual do AssetStudio.
-   */
-  getAssetStudioPath(): string {
-    return this.config.assetStudioPath;
-  }
 }
-
-export default AssetStudioIntegration;

@@ -93,11 +93,11 @@ export function Sidebar({ files, selectedFile, onSelectFile, onAddFolder, stats 
               {files.map((file) => (
                 <li key={file.id}>
                   <button
-                    onClick={() => onSelectFile(file.id)}
+                    onClick={() => onSelectFile(file.name)}
                     className={`
                       w-full flex items-center gap-2 px-3 py-2 rounded text-left
                       transition-colors duration-150 text-sidebar
-                      ${selectedFile === file.id 
+                      ${selectedFile === file.name 
                         ? 'bg-status-translated/20 text-status-translated border-l-2 border-status-translated' 
                         : 'text-cat-dark-300 hover:bg-cat-dark-700/50 hover:text-cat-dark-200'
                       }

@@ -125,13 +125,22 @@ function App() {
   };
 
   /**
-   * API: Buscar strings de um arquivo.
+   * API: Buscar strings de um arquivo com paginação.
    */
-  const loadStrings = async (fileId: string) => {
+  const loadStrings = async (fileId: string, page: number = 1, pageSize: number = 1000) => {
     setLoading(prev => ({ ...prev, strings: true }));
     try {
-      const stringList = await window.api.fetchStringsByFile(fileId);
+      const result = await window.api.fetchStringsByFile(fileId, page, pageSize);
+      
+      // Handle both old format (array) and new format (object with pagination)
+      const stringList = Array.isArray(result) ? result : result.strings;
+      
       setStrings(stringList as StringItem[]);
+      
+      // Log para debug
+      if (!Array.isArray(result)) {
+        console.log(`[App] Carregadas ${stringList.length} strings de ${result.total} totais (página ${result.page})`);
+      }
       
       // Selecionar primeira string automaticamente
       if (stringList.length > 0 && !selectedStringId) {

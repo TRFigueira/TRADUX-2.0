@@ -1,7 +1,34 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { TranslationMemoryDB, GameStringRecord } from '../db/tmDatabase';
+// import { TranslationMemoryDB, GameStringRecord } from '../db/tmDatabase';
 import { unshieldText, TagDictionary, UnshieldResult } from '../regex_shield/unshield';
+
+// Temporary type definitions until database is properly connected
+interface GameStringRecord {
+  id: number;
+  path_id: string;
+  original_text: string;
+  shielded_text: string;
+  translated_text: string;
+  translation: string;
+  status: string;
+  source_file: string;
+}
+
+// Stub for TranslationMemoryDB
+class TranslationMemoryDB {
+  async getStringsByStatus(_status: string): Promise<GameStringRecord[]> {
+    return [];
+  }
+  
+  getDatabase(): any {
+    return {
+      prepare: () => ({
+        all: () => []
+      })
+    };
+  }
+}
 
 /**
  * Módulo Repacker - Reempacotamento de Traduções

@@ -149,21 +149,39 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
     setSelectedAssets(new Set());
 
     try {
-      const scanResult = await window.api.scanUnityGame();
+      // Primeiro, obter o caminho do jogo selecionado
+      const importResult = await window.api.importUnityGame();
       
-      if (!scanResult.success) {
-        setError(scanResult.error || 'Erro no scan');
+      if (!importResult.success || !importResult.gamePath) {
+        setError('Nenhuma pasta de jogo selecionada');
         return;
       }
 
-      setResult(scanResult);
+      // Agora fazer o scan com o caminho correto
+      const scanResult = await window.api.scanUnityGame(importResult.gamePath);
+      
+      if (!scanResult.gamePath) {
+        setError('Scan cancelado ou pasta inválida');
+        return;
+      }
+
+      const resultData: ScanResult = {
+        gamePath: scanResult.gamePath,
+        files: scanResult.files || [],
+        totalFiles: scanResult.totalFiles || 0,
+        translatableFiles: scanResult.translatableFiles || 0,
+        totalStrings: scanResult.totalStrings || 0,
+        durationMs: scanResult.durationMs || 0
+      };
+
+      setResult(resultData);
       setSelectedFiles(new Set());
       setExpandedFiles(new Set());
 
       // Se não há arquivos traduzíveis, tentar scan de .assets com AssetStudio
-      if (scanResult.translatableFiles === 0 && assetStudioStatus?.available) {
+      if (resultData.translatableFiles === 0 && assetStudioStatus?.available) {
         try {
-          const assetScanResult = await window.api.scanAssetsFilesAssetStudio(scanResult.gamePath);
+          const assetScanResult = await window.api.scanAssetsFilesAssetStudio(resultData.gamePath);
           if (assetScanResult.success) {
             setAssetFiles(assetScanResult.files);
           }
@@ -195,7 +213,12 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
     });
 
     try {
-      const filesToImport = result?.files.filter(f => selectedFiles.has(f.path)) || [];
+      if (!result) {
+        setError('Nenhum resultado de scan disponível');
+        return;
+      }
+      
+      const filesToImport = result.files.filter(f => selectedFiles.has(f.path));
       const importResult = await window.api.importScannedFiles(filesToImport);
 
       if (importResult.success) {
@@ -204,8 +227,8 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
       } else {
         setError(importResult.error || 'Erro na importação');
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro na importação');
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Erro na importação');
     } finally {
       setIsImporting(false);
       setProgress(null);

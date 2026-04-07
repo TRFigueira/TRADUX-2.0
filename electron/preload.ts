@@ -20,16 +20,31 @@ export interface ElectronAPI {
     count: { count: number };
   }>>;
   
-  // Buscar strings de um arquivo específico
-  fetchStringsByFile: (fileId: string) => Promise<Array<{
-    id: number;
-    source_file: string;
-    path_id: string;
-    original_text: string;
-    shielded_text: string;
-    translated_text: string | null;
-    status: string;
-  }>>;
+  // Buscar strings de um arquivo específico com paginação
+  fetchStringsByFile: (fileId: string, page?: number, pageSize?: number) => Promise<
+    Array<{
+      id: number;
+      source_file: string;
+      path_id: string;
+      original_text: string;
+      shielded_text: string;
+      translated_text: string | null;
+      status: string;
+    }> | {
+      strings: Array<{
+        id: number;
+        source_file: string;
+        path_id: string;
+        original_text: string;
+        shielded_text: string;
+        translated_text: string | null;
+        status: string;
+      }>;
+      total: number;
+      page: number;
+      pageSize: number;
+    }
+  >;
   
   // Salvar tradução de uma string
   translateString: (id: number, translatedText: string) => Promise<unknown>;
@@ -49,6 +64,13 @@ export interface ElectronAPI {
     warnings: string[];
     originalLength?: number;
     translatedLength?: number;
+  }>;
+  
+  // Importar pasta do jogo Unity
+  importUnityGame: () => Promise<{
+    success: boolean;
+    gamePath?: string;
+    error?: string;
   }>;
   
   // Exportação de traduções (Repacker)
@@ -86,8 +108,7 @@ export interface ElectronAPI {
   }>;
   
   // Skill: Unity Auto-Discovery - Deep Scan de jogos Unity
-  scanUnityGame: () => Promise<{
-    canceled: boolean;
+  scanUnityGame: (gamePath: string) => Promise<{
     gamePath?: string;
     files?: Array<{
       path: string;
@@ -186,11 +207,13 @@ const api: ElectronAPI = {
   fetchFiles: () => ipcRenderer.invoke('fetch-files'),
 
   /**
-   * Buscar todas as strings de um arquivo específico.
+   * Buscar strings de um arquivo específico com paginação.
    * @param fileId - Identificador do arquivo (source_file)
+   * @param page - Número da página (default: 1)
+   * @param pageSize - Tamanho da página (default: 1000)
    */
-  fetchStringsByFile: (fileId: string) => 
-    ipcRenderer.invoke('fetch-strings-by-file', fileId),
+  fetchStringsByFile: (fileId: string, page: number = 1, pageSize: number = 1000) => 
+    ipcRenderer.invoke('fetch-strings-by-file', fileId, page, pageSize),
 
   /**
    * Salvar tradução de uma string no banco de dados.
@@ -234,6 +257,12 @@ const api: ElectronAPI = {
   },
 
   /**
+   * Importar pasta do jogo Unity.
+   * @returns Resultado da seleção com caminho da pasta
+   */
+  importUnityGame: () => ipcRenderer.invoke('import-unity-game'),
+
+  /**
    * Abrir dialog para selecionar pasta e importar arquivos de tradução.
    * @returns Resultado da importação com estatísticas
    */
@@ -241,10 +270,10 @@ const api: ElectronAPI = {
 
   /**
    * Skill: Unity Auto-Discovery - Deep Scan de jogos Unity.
-   * Varre pasta do jogo, encontra arquivos traduzíveis e retorna lista.
+   * @param gamePath - Pasta do jogo Unity para scanear
    * @returns Resultado do scan com arquivos encontrados
    */
-  scanUnityGame: () => ipcRenderer.invoke('scan-unity-game'),
+  scanUnityGame: (gamePath: string) => ipcRenderer.invoke('scan-unity-game', gamePath),
 
   /**
    * Importar arquivos selecionados do scan para o banco de dados.
