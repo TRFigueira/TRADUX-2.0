@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { TraduxDatabase } from '../src/database/TraduxDatabase';
+import { processFile, TranslatableString } from './assetProcessors';
 
 // Função principal de inicialização
 function initializeApp() {
@@ -627,6 +628,22 @@ function initializeApp() {
   async function scanTranslatableFiles(gamePath: string): Promise<any[]> {
     const files: any[] = [];
     
+    // Unity game text locations to prioritize
+    const textLocations = [
+      'StreamingAssets',      // Common for game data
+      'Resources',            // Unity Resources folder
+      'Assets/Resources',
+      'Assets/StreamingAssets',
+      'Data',                 // Generic data folder
+      'Localization',         // Localization folder
+      'Languages',            // Language files
+      'Text',                 // Text files
+      'Dialogues',            // Dialogue files
+      'Dialog',               // Alternative spelling
+      'Scripts',              // Scripts with embedded text
+      'Managed',              // .NET assemblies
+    ];
+    
     function walkDir(dir: string, relativePath: string = '') {
       try {
         const items = fs.readdirSync(dir);
@@ -635,24 +652,73 @@ function initializeApp() {
           const fullPath = path.join(dir, item);
           const itemRelativePath = relativePath ? path.join(relativePath, item) : item;
           
+          // Skip only obvious non-game folders
           if (fs.statSync(fullPath).isDirectory()) {
+            // Skip: Logs, Temp, Cache, but NOT Resources/StreamingAssets!
+            const skipFolders = ['logs', 'temp', 'cache', 'crashdumps', 'debug'];
+            const lowerItem = item.toLowerCase();
+            if (skipFolders.includes(lowerItem)) {
+              console.log(`[Scan] Pulando pasta: ${item}`);
+              continue;
+            }
             walkDir(fullPath, itemRelativePath);
           } else if (
-            item.match(/\.(txt|json|xml|csv|lua|py|js|ts|cs|assets)$/i) ||
-            item.match(/\.resS$/i)
+            // Text files with game content
+            item.match(/\.(txt|json|xml|csv|yaml|yml|tsv)$/i) ||
+            // Unity assets
+            item.match(/\.assets$/i) ||
+            // Resource files  
+            item.match(/\.resS$/i) ||
+            // Mono/.NET assemblies (may contain embedded text)
+            item.match(/\.dll$/i) ||
+            // Unity scenes/prefabs (may contain UI text)
+            item.match(/\.unity$/i) ||
+            item.match(/\.prefab$/i) ||
+            // Specific game text patterns
+            item.match(/dialog/i) ||
+            item.match(/localization/i) ||
+            item.match(/lang/i) ||
+            item.match(/text/i) ||
+            item.match(/string/i)
           ) {
             try {
               const stats = fs.statSync(fullPath);
+              
+              // Calculate priority based on location and name
+              let priority = 1;
+              let confidence = 0.5;
+              
+              const lowerPath = fullPath.toLowerCase();
+              const lowerName = item.toLowerCase();
+              
+              // High priority for known text locations
+              if (textLocations.some(loc => lowerPath.includes(loc.toLowerCase()))) {
+                priority = 10;
+                confidence = 0.9;
+              }
+              
+              // High priority for text/content related names
+              if (lowerName.match(/dialog|text|lang|localization|string|conversation|npc|quest/)) {
+                priority = 20;
+                confidence = 0.95;
+              }
+              
+              // Medium priority for common game formats
+              if (lowerName.match(/\.json$|\.xml$|\.csv$|\.txt$/)) {
+                priority = Math.max(priority, 5);
+                confidence = Math.max(confidence, 0.7);
+              }
+              
               files.push({
                 path: fullPath,
                 relativePath: itemRelativePath,
                 name: item,
                 extension: path.extname(item),
                 size: stats.size,
-                priority: 1,
+                priority: priority,
                 isTranslatable: true,
-                confidence: 0.8,
-                preview: `Arquivo traduzível: ${item}`
+                confidence: confidence,
+                preview: `Arquivo encontrado: ${item} (${Math.round(confidence * 100)}% confiança)`
               });
             } catch (error) {
               console.warn(`[Main] Erro ao ler arquivo ${fullPath}:`, error);
@@ -665,6 +731,13 @@ function initializeApp() {
     }
     
     walkDir(gamePath);
+    
+    // Sort by priority (highest first)
+    files.sort((a, b) => b.priority - a.priority);
+    
+    console.log(`[Scan] Encontrados ${files.length} arquivos candidatos`);
+    console.log(`[Scan] Top 10 por prioridade:`, files.slice(0, 10).map(f => `${f.name} (prio:${f.priority})`));
+    
     return files;
   }
 
@@ -719,16 +792,30 @@ function initializeApp() {
         return strings;
       }
       
-      // Read file content
-      const buffer = fs.readFileSync(filePath);
-      
-      // For binary files (.assets, .resS), use different extraction
-      if (ext === '.assets' || ext === '.ress' || ext === '.resS') {
-        return extractFromBinaryFile(buffer, fileName, stats.size);
+      // Use specialized processors for known text formats
+      if (['.json', '.csv', '.xml', '.txt'].includes(ext)) {
+        console.log(`[Main] Usando processador especializado para ${fileName}`);
+        const extracted = await processFile(filePath);
+        
+        for (const str of extracted) {
+          strings.push({
+            path_id: str.id,
+            original_text: str.originalText,
+            assetFile: fileName,
+          });
+        }
+        
+        console.log(`[Main] Processador extraiu ${strings.length} textos de ${fileName}`);
+        return strings;
       }
       
-      // For text files, read as UTF-8
-      const content = buffer.toString('utf8', 0, Math.min(buffer.length, 500000));
+      // For binary Unity files, use binary extraction
+      if (ext === '.assets' || ext === '.ress' || ext === '.resS') {
+        return extractFromBinaryFile(await fs.promises.readFile(filePath), fileName, stats.size);
+      }
+      
+      // Fallback to simple text extraction
+      const content = (await fs.promises.readFile(filePath)).toString('utf8', 0, Math.min(stats.size, 500000));
       
       // Method 1: Extract strings between quotes
       const quotePattern = /"([^"]{3,500})"/g;
