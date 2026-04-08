@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import { spawn } from 'child_process';
 import { TraduxDatabase } from '../src/database/TraduxDatabase';
 import { processFile, TranslatableString } from './assetProcessors';
 
@@ -51,6 +52,117 @@ function initializeApp() {
       console.error('[Main] Failed to initialize database:', error);
       throw error;
     }
+  }
+
+  // Extract text using AssetStudioCLI with proper type filtering
+  async function extractWithAssetStudioCLI(gamePath: string): Promise<Array<{path_id: string; original_text: string; assetFile: string}>> {
+    const strings: Array<{path_id: string; original_text: string; assetFile: string}> = [];
+    
+    const assetStudioPath = path.join(app.getPath('userData'), 'tools', 'AssetStudioCLI_net6_win_x64.exe');
+    
+    // Check if AssetStudioCLI exists
+    if (!fs.existsSync(assetStudioPath)) {
+      console.log('[AssetStudio] CLI not found, falling back to manual extraction');
+      return strings;
+    }
+    
+    const tempOutputDir = path.join(app.getPath('temp'), 'tradux-extract-' + Date.now());
+    fs.mkdirSync(tempOutputDir, { recursive: true });
+    
+    try {
+      console.log('[AssetStudio] Starting extraction with type filtering...');
+      
+      // Use AssetStudioCLI with --type TextAsset,MonoBehaviour and --filter for localization/dialogue paths
+      const args = [
+        gamePath,
+        tempOutputDir,
+        '--game', 'TOT',
+        '--export', 'text',
+        '--type', 'TextAsset,MonoBehaviour',
+        '--filter', 'Localization|Dialogue|UI|Menu|Text|Story|Conversation'
+      ];
+      
+      console.log('[AssetStudio] Command:', assetStudioPath, args.join(' '));
+      
+      await new Promise((resolve, reject) => {
+        const process = spawn(assetStudioPath, args, {
+          timeout: 300000 // 5 minute timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        process.stdout.on('data', (data) => {
+          stdout += data.toString();
+          console.log('[AssetStudio]', data.toString().trim());
+        });
+        
+        process.stderr.on('data', (data) => {
+          stderr += data.toString();
+          console.error('[AssetStudio]', data.toString().trim());
+        });
+        
+        process.on('close', (code) => {
+          if (code === 0) {
+            resolve(null);
+          } else {
+            reject(new Error(`AssetStudioCLI exited with code ${code}: ${stderr}`));
+          }
+        });
+        
+        process.on('error', (err) => {
+          reject(err);
+        });
+      });
+      
+      // Process extracted files
+      const extractTextFiles = (dir: string) => {
+        const files = fs.readdirSync(dir);
+        let index = 0;
+        
+        for (const file of files) {
+          const filePath = path.join(dir, file);
+          const stat = fs.statSync(filePath);
+          
+          if (stat.isDirectory()) {
+            extractTextFiles(filePath);
+          } else if (file.endsWith('.txt') || file.endsWith('.json')) {
+            try {
+              const content = fs.readFileSync(filePath, 'utf8');
+              const lines = content.split('\n');
+              
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (isRealGameText(trimmed)) {
+                  strings.push({
+                    path_id: `${file}_${index++}`,
+                    original_text: trimmed,
+                    assetFile: file
+                  });
+                }
+              }
+            } catch (err) {
+              console.error('[AssetStudio] Error reading:', filePath, err);
+            }
+          }
+        }
+      };
+      
+      extractTextFiles(tempOutputDir);
+      console.log(`[AssetStudio] Extracted ${strings.length} strings from TextAssets`);
+      
+    } catch (error) {
+      console.error('[AssetStudio] Extraction failed:', error);
+    } finally {
+      // Cleanup temp directory
+      try {
+        fs.rmSync(tempOutputDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    
+    return strings;
   }
 
   // Configurar handlers IPC
@@ -390,19 +502,50 @@ function initializeApp() {
     });
 
     ipcMain.handle('extract-assets-texts-assetstudio', async (_event, assetFiles: any[]) => {
-      console.log('[Main] Extração simplificada de textos com AssetStudio:', assetFiles.length, 'arquivos');
+      console.log('[Main] Extraindo textos com AssetStudioCLI:', assetFiles.length, 'arquivos');
       
       try {
-        const mockStrings = assetFiles.map((file, index) => ({
-          path_id: `${file.name}_${index}`,
-          original_text: `[Texto extraído de ${file.name}]`,
-          assetFile: file.name
-        }));
+        let totalStrings: Array<{path_id: string; original_text: string; assetFile: string}> = [];
+        
+        // If we have .assets files, try to use AssetStudioCLI on the game directory
+        const assetsFile = assetFiles.find(f => f.name?.endsWith('.assets') || f.path?.includes('.assets'));
+        
+        if (assetsFile) {
+          const gamePath = path.dirname(assetsFile.path);
+          console.log('[Main] Tentando extrair com AssetStudioCLI de:', gamePath);
+          
+          // Try AssetStudioCLI extraction first
+          const cliStrings = await extractWithAssetStudioCLI(gamePath);
+          
+          if (cliStrings.length > 0) {
+            console.log(`[Main] AssetStudioCLI extraíou ${cliStrings.length} textos`);
+            totalStrings = cliStrings;
+          } else {
+            console.log('[Main] AssetStudioCLI não encontrou textos, usando extração binária...');
+            // Fallback to binary extraction for each file
+            for (const file of assetFiles) {
+              if (fs.existsSync(file.path)) {
+                const buffer = fs.readFileSync(file.path);
+                const strings = extractFromBinaryFile(buffer, file.name, buffer.length);
+                totalStrings.push(...strings);
+              }
+            }
+          }
+        } else {
+          // No .assets files, use binary extraction
+          for (const file of assetFiles) {
+            if (fs.existsSync(file.path)) {
+              const buffer = fs.readFileSync(file.path);
+              const strings = extractFromBinaryFile(buffer, file.name, buffer.length);
+              totalStrings.push(...strings);
+            }
+          }
+        }
         
         return {
           success: true,
-          stringsExtracted: mockStrings.length,
-          message: `Extração concluída! ${mockStrings.length} textos extraídos de ${assetFiles.length} arquivos.`,
+          stringsExtracted: totalStrings.length,
+          message: `Extração concluída! ${totalStrings.length} textos extraídos de ${assetFiles.length} arquivos.`,
           errors: []
         };
         
