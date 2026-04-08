@@ -949,9 +949,20 @@ function initializeApp() {
   function isRealGameText(text: string): boolean {
     if (!text || text.length < 5 || text.length > 500) return false;
     
-    // Must contain at least one letter
-    const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
+    // Must contain at least one letter (including accented)
+    const letterCount = (text.match(/[a-zA-Z\u00C0-\u017F]/g) || []).length;
     if (letterCount < 3) return false;
+    
+    // ===== BINARY DATA FILTERS =====
+    // Must contain spaces (more than one word required)
+    if (!text.includes(' ')) return false;
+    
+    // Reject lines with repeated symbols (->->->, ???, ===, etc.)
+    if (/(-{2,}|>{2,}|[?]{2,}|[=]{2,}|[\|]{2,}|[\[]){3,}/.test(text)) return false;
+    
+    // Reject if too many non-letter characters (likely binary)
+    const nonLetterCount = text.length - letterCount;
+    if (nonLetterCount > letterCount * 2) return false; // More non-letters than letters
     
     // ===== ENHANCED FILTERS - Exclude code/metadata =====
     
@@ -991,9 +1002,6 @@ function initializeApp() {
     const dotCount = (text.match(/\./g) || []).length;
     if (dotCount > 3 && letterCount < 20) return false;
     
-    // Skip if no spaces at all (likely a single identifier)
-    if (!text.includes(' ') && letterCount < 15) return false;
-    
     // Skip if mostly non-alphabetic (binary or encoded)
     const nonAlphaRatio = (text.length - letterCount) / text.length;
     if (nonAlphaRatio > 0.5) return false;
@@ -1015,19 +1023,47 @@ function initializeApp() {
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return false;
     if (/fileID: \d+/.test(text)) return false;
     
-    // Check for actual sentences (indicates real text)
+    // NATURAL LANGUAGE DETECTION - Must look like human text
+    // Check for at least 2 words (require space between them)
+    const wordCount = text.trim().split(/\s+/).length;
+    if (wordCount < 2 && letterCount < 20) return false;
+    
+    // Check for actual sentences or common words (indicates real text)
     const hasSentenceStructure = /[.!?]$/.test(text) || 
                                   text.includes(' the ') || 
                                   text.includes(' you ') ||
                                   text.includes(' and ') ||
                                   text.includes(' The ') ||
+                                  text.includes(' a ') ||
+                                  text.includes(' to ') ||
+                                  text.includes(' of ') ||
+                                  text.includes(' is ') ||
+                                  text.includes(' in ') ||
+                                  text.includes(' for ') ||
+                                  text.includes(' with ') ||
+                                  text.includes(' on ') ||
+                                  text.includes(' at ') ||
+                                  text.includes(' from ') ||
+                                  // Common game UI terms
                                   text.includes('Hello') ||
                                   text.includes('Welcome') ||
                                   text.includes('Click') ||
                                   text.includes('Press') ||
-                                  text.includes(' to ') ||
-                                  text.includes(' a ') ||
-                                  text.includes(' is ');
+                                  text.includes('Start') ||
+                                  text.includes('Menu') ||
+                                  text.includes('Options') ||
+                                  text.includes('Quit') ||
+                                  text.includes('Exit') ||
+                                  text.includes('Continue') ||
+                                  text.includes('Back') ||
+                                  text.includes('Next') ||
+                                  text.includes('Save') ||
+                                  text.includes('Load') ||
+                                  text.includes('Play') ||
+                                  text.includes('Pause') ||
+                                  text.includes('Resume') ||
+                                  text.includes('Confirm') ||
+                                  text.includes('Cancel');
     
     if (!hasSentenceStructure && letterCount < 15) return false;
     
