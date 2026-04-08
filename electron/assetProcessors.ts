@@ -93,15 +93,66 @@ export class JsonAssetProcessor implements IAssetProcessor {
   }
 
   private isValidText(text: string): boolean {
-    // Skip if too short or looks like code
-    if (text.length < 3) return false;
-    if (text.startsWith('http') || text.includes('://')) return false;
-    if (/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(text) && text.length < 20) return false; // variable name
-    if (/^[0-9a-f-]{8,}$/i.test(text)) return false; // hex/guid
+    // Same aggressive filters as main.ts isRealGameText
+    if (!text || text.length < 5 || text.length > 500) return false;
     
-    // Must contain actual words
-    const wordCount = (text.match(/\b[a-zA-Z]{2,}\b/g) || []).length;
-    return wordCount >= 1;
+    const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
+    if (letterCount < 3) return false;
+    
+    // CRITICAL: Exclude Unity/Technical content
+    if (text.includes('::')) return false; // C++ method
+    if (/\w+\.\w+\.\w+/.test(text) && text.includes('(')) return false; // Method call
+    if (text.startsWith('UnityEngine.')) return false;
+    if (text.startsWith('Unity.')) return false;
+    if (text.startsWith('System.')) return false;
+    if (text.startsWith('Mono.')) return false;
+    if (text.includes('PublicKeyToken=')) return false;
+    if (text.includes('mscorlib')) return false;
+    if (text.includes('Version=') && text.includes('Culture=')) return false;
+    if (text.includes('Version=') && text.includes('PublicKeyToken=')) return false;
+    if (text.includes('ResourceManagement')) return false; // Unity Addressables
+    if (text.includes('ResourceProviders')) return false;
+    if (text.includes('SceneProvider') || text.includes('InstanceProvider')) return false;
+    
+    // Hex/ID patterns
+    if (/^[0-9a-f]{16,}$/i.test(text)) return false;
+    
+    // Variable names (camelCase/PascalCase without spaces)
+    if (/^[A-Z][a-z]+[A-Z]/.test(text) && !text.includes(' ')) return false;
+    if (/^[a-z]+[A-Z]/.test(text) && !text.includes(' ')) return false;
+    
+    // Too many dots (namespace path)
+    const dotCount = (text.match(/\./g) || []).length;
+    if (dotCount > 3 && letterCount < 20) return false;
+    
+    // No spaces at all (single identifier)
+    if (!text.includes(' ') && letterCount < 15) return false;
+    
+    // Mostly non-alphabetic
+    const nonAlphaRatio = (text.length - letterCount) / text.length;
+    if (nonAlphaRatio > 0.5) return false;
+    
+    // URLs/paths
+    if (text.startsWith('http') || text.includes('://')) return false;
+    if (text.includes('Assets/') || text.includes('Resources/')) return false;
+    
+    // Must look like natural language
+    const hasSentenceStructure = /[.!?]$/.test(text) || 
+                                  text.includes(' the ') || 
+                                  text.includes(' you ') ||
+                                  text.includes(' and ') ||
+                                  text.includes(' The ') ||
+                                  text.includes('Hello') ||
+                                  text.includes('Welcome') ||
+                                  text.includes('Click') ||
+                                  text.includes('Press') ||
+                                  text.includes(' to ') ||
+                                  text.includes(' a ') ||
+                                  text.includes(' is ');
+    
+    if (!hasSentenceStructure && letterCount < 15) return false;
+    
+    return true;
   }
 
   private detectCategory(key: string, text: string): TranslatableString['category'] {
@@ -199,8 +250,33 @@ export class CsvAssetProcessor implements IAssetProcessor {
   }
 
   private isValidText(text: string): boolean {
-    if (text.length < 3) return false;
+    // Same aggressive filters
+    if (!text || text.length < 5 || text.length > 500) return false;
+    
+    const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
+    if (letterCount < 3) return false;
+    
     if (text.match(/^\d+$/)) return false; // just numbers
+    
+    // Unity/Technical exclusions
+    if (text.includes('UnityEngine.')) return false;
+    if (text.includes('Unity.')) return false;
+    if (text.includes('System.')) return false;
+    if (text.includes('PublicKeyToken=')) return false;
+    if (text.includes('Version=') && text.includes('Culture=')) return false;
+    if (text.includes('ResourceManagement')) return false;
+    if (text.includes('ResourceProviders')) return false;
+    if (text.includes('SceneProvider') || text.includes('InstanceProvider')) return false;
+    
+    // Must look like natural language
+    const hasSentenceStructure = /[.!?]$/.test(text) || 
+                                  text.includes(' ') ||
+                                  text.includes('Hello') ||
+                                  text.includes('Welcome') ||
+                                  text.includes(' the ');
+    
+    if (!hasSentenceStructure && letterCount < 10) return false;
+    
     return true;
   }
 
@@ -258,9 +334,33 @@ export class XmlAssetProcessor implements IAssetProcessor {
   }
 
   private isValidText(text: string): boolean {
-    if (text.length < 3) return false;
+    if (!text || text.length < 5 || text.length > 500) return false;
+    
+    const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
+    if (letterCount < 3) return false;
+    
     // Skip if only whitespace or numbers
     if (text.replace(/\s/g, '').match(/^\d+$/)) return false;
+    
+    // Unity/Technical exclusions
+    if (text.includes('UnityEngine.')) return false;
+    if (text.includes('Unity.')) return false;
+    if (text.includes('System.')) return false;
+    if (text.includes('PublicKeyToken=')) return false;
+    if (text.includes('Version=') && text.includes('Culture=')) return false;
+    if (text.includes('ResourceManagement')) return false;
+    if (text.includes('ResourceProviders')) return false;
+    if (text.includes('SceneProvider') || text.includes('InstanceProvider')) return false;
+    
+    // Must look like natural language
+    const hasSentenceStructure = /[.!?]$/.test(text) || 
+                                  text.includes(' ') ||
+                                  text.includes('Hello') ||
+                                  text.includes('Welcome') ||
+                                  text.includes(' the ');
+    
+    if (!hasSentenceStructure && letterCount < 10) return false;
+    
     return true;
   }
 
@@ -312,13 +412,33 @@ export class TextAssetProcessor implements IAssetProcessor {
 
   private isValidText(text: string): boolean {
     // Skip empty lines
-    if (!text || text.length < 5) return false;
+    if (!text || text.length < 5 || text.length > 500) return false;
+    
+    const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
+    if (letterCount < 3) return false;
     
     // Skip comment lines
     if (text.startsWith('//') || text.startsWith('#') || text.startsWith(';')) return false;
     
     // Skip if looks like code
     if (text.startsWith('using ') || text.startsWith('namespace ') || text.startsWith('class ')) return false;
+    
+    // Unity/Technical exclusions
+    if (text.includes('UnityEngine.')) return false;
+    if (text.includes('Unity.')) return false;
+    if (text.includes('System.')) return false;
+    if (text.includes('PublicKeyToken=')) return false;
+    if (text.includes('Version=') && text.includes('Culture=')) return false;
+    if (text.includes('ResourceManagement')) return false;
+    if (text.includes('ResourceProviders')) return false;
+    if (text.includes('SceneProvider') || text.includes('InstanceProvider')) return false;
+    
+    // Must look like natural language or have reasonable content
+    const hasSentenceStructure = /[.!?]$/.test(text) || 
+                                  text.includes(' ') ||
+                                  text.length > 20;
+    
+    if (!hasSentenceStructure && letterCount < 10) return false;
     
     return true;
   }
