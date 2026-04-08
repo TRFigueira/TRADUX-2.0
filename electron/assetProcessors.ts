@@ -93,15 +93,12 @@ export class JsonAssetProcessor implements IAssetProcessor {
   }
 
   private isValidText(text: string): boolean {
-    // Same aggressive filters as main.ts isRealGameText
     if (!text || text.length < 5 || text.length > 500) return false;
     
     const letterCount = (text.match(/[a-zA-Z]/g) || []).length;
     if (letterCount < 3) return false;
     
-    // CRITICAL: Exclude Unity/Technical content
-    if (text.includes('::')) return false; // C++ method
-    if (/\w+\.\w+\.\w+/.test(text) && text.includes('(')) return false; // Method call
+    // CRITICAL: Exclude Unity Addressables metadata
     if (text.startsWith('UnityEngine.')) return false;
     if (text.startsWith('Unity.')) return false;
     if (text.startsWith('System.')) return false;
@@ -110,47 +107,75 @@ export class JsonAssetProcessor implements IAssetProcessor {
     if (text.includes('mscorlib')) return false;
     if (text.includes('Version=') && text.includes('Culture=')) return false;
     if (text.includes('Version=') && text.includes('PublicKeyToken=')) return false;
-    if (text.includes('ResourceManagement')) return false; // Unity Addressables
-    if (text.includes('ResourceProviders')) return false;
-    if (text.includes('SceneProvider') || text.includes('InstanceProvider')) return false;
+    if (text.includes('BurstGenerated')) return false;
+    if (text.includes('CalcVertex') || text.includes('CalcTriangle') || text.includes('CalcNormal')) return false;
+    if (text.includes('JobParallelFor')) return false;
+    if (text.includes('JobRanges')) return false;
     
-    // Hex/ID patterns
-    if (/^[0-9a-f]{16,}$/i.test(text)) return false;
+    // UNITY ADDRESSABLES SPECIFIC EXCLUSIONS
+    if (text.includes('ResourceManagement')) return false; // Unity Addressables
+    if (text.includes('ResourceProviders')) return false; // Addressables providers
+    if (text.includes('SceneProvider') || text.includes('InstanceProvider')) return false;
+    if (text.includes('AssetBundleProvider') || text.includes('ContentCatalogProvider')) return false;
+    if (text.includes('LegacyResourcesProvider')) return false;
+    if (text.includes('Addressables') || text.includes('Addressable')) return false;
+    if (text.includes('ResourceManager') || text.includes('ResourceProvider')) return false;
+    
+    // Hash/ID patterns
+    if (/^[0-9a-f]{16,}$/i.test(text)) return false; // Long hex strings
+    if (/\b[0-9a-f]{8}-[0-9a-f]{4}/i.test(text)) return false; // GUID fragments
     
     // Variable names (camelCase/PascalCase without spaces)
     if (/^[A-Z][a-z]+[A-Z]/.test(text) && !text.includes(' ')) return false;
     if (/^[a-z]+[A-Z]/.test(text) && !text.includes(' ')) return false;
     
-    // Too many dots (namespace path)
+    // Too many dots (likely namespace path)
     const dotCount = (text.match(/\./g) || []).length;
     if (dotCount > 3 && letterCount < 20) return false;
     
-    // No spaces at all (single identifier)
+    // No spaces at all (likely a single identifier)
     if (!text.includes(' ') && letterCount < 15) return false;
     
-    // Mostly non-alphabetic
+    // Mostly non-alphabetic (binary or encoded)
     const nonAlphaRatio = (text.length - letterCount) / text.length;
     if (nonAlphaRatio > 0.5) return false;
     
-    // URLs/paths
-    if (text.startsWith('http') || text.includes('://')) return false;
+    // Skip if looks like code/technical
+    if (text.includes('m_') && text.includes('_')) return false; // Unity variable names
+    if (/^[0-9a-fA-F]{8,}$/.test(text)) return false; // Hex strings
+    if (/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(text) && text.length < 20) return false; // variable names
+    if (text.includes('->')) return false; // C++ pointer
+    if (text.startsWith('k__') || text.startsWith('<>')) return false; // Compiler generated
+    if (text.includes('Assembly') || text.includes('Version=')) return false; // Assembly info
+    if (text.endsWith('.dll') || text.endsWith('.cs')) return false; // File references
+    
+    // Skip paths
     if (text.includes('Assets/') || text.includes('Resources/')) return false;
+    if (text.includes('StreamingAssets/')) return false;
     
-    // Must look like natural language
-    const hasSentenceStructure = /[.!?]$/.test(text) || 
-                                  text.includes(' the ') || 
-                                  text.includes(' you ') ||
-                                  text.includes(' and ') ||
-                                  text.includes(' The ') ||
-                                  text.includes('Hello') ||
-                                  text.includes('Welcome') ||
-                                  text.includes('Click') ||
-                                  text.includes('Press') ||
-                                  text.includes(' to ') ||
-                                  text.includes(' a ') ||
-                                  text.includes(' is ');
+    // Skip GUIDs and IDs
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return false;
+    if (/fileID: \d+/.test(text)) return false;
     
-    if (!hasSentenceStructure && letterCount < 15) return false;
+    // NATURAL LANGUAGE DETECTION - Must look like human text
+    const hasNaturalLanguage = 
+          // Common words/phrases
+          text.includes(' the ') || text.includes(' you ') || text.includes(' and ') ||
+          text.includes(' The ') || text.includes(' You ') || text.includes(' And ') ||
+          // Common game terms
+          text.includes('Hello') || text.includes('Welcome') || text.includes('Click') ||
+          text.includes('Press') || text.includes('Start') || text.includes('Menu') ||
+          text.includes('Options') || text.includes('Quit') || text.includes('Exit') ||
+          text.includes('Continue') || text.includes('Back') || text.includes('Next') ||
+          // Sentence structure
+          /[.!?]$/.test(text) ||
+          // Contains spaces and reasonable length
+          (text.includes(' ') && letterCount >= 10) ||
+          // Contains common connectors
+          text.includes(' to ') || text.includes(' a ') || text.includes(' is ') ||
+          text.includes(' of ') || text.includes(' for ') || text.includes(' with ');
+    
+    if (!hasNaturalLanguage && letterCount < 15) return false;
     
     return true;
   }

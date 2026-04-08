@@ -644,6 +644,13 @@ function initializeApp() {
       /il2cpp/i,                  // IL2CPP generated files
       /Assembly-CSharp-firstpass/i,
       /Assembly-UnityScript/i,
+      // Unity Addressables - System files, not game text
+      /catalog\.json/i,           // Addressables catalog
+      /catalog\.json\.meta/i,      // Unity metadata
+      /addressables_assets\.json/i, // Addressables manifest
+      /buildsettings\.json/i,      // Build settings
+      /projectsettings\.json/i,    // Project settings
+      /bundleconfig\.json/i,       // Bundle configuration
     ];
     
     // Unity game text locations to prioritize
