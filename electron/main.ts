@@ -613,8 +613,10 @@ function initializeApp() {
     ipcMain.handle('clear-all-strings', async () => {
       console.log('[Main] Limpando todas as strings');
       try {
-        // In a real implementation, this would clear the strings table
-        return { success: true, cleared: true };
+        if (!db) throw new Error('Database not initialized');
+        
+        const result = db.clearAllStrings();
+        return { success: true, cleared: result.deleted };
       } catch (error) {
         console.error('[Main] Erro ao limpar strings:', error);
         return { success: false, error: (error as Error).message };

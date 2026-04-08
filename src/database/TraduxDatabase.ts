@@ -275,6 +275,12 @@ export class TraduxDatabase {
     return this.db.prepare(query).all(...params);
   }
 
+  clearAllStrings(): { deleted: number } {
+    const result = this.db.prepare('DELETE FROM strings').run();
+    console.log(`[TraduxDatabase] Cleared ${result.changes} strings`);
+    return { deleted: result.changes };
+  }
+
   // Translation methods
   createTranslation(stringId: number, languageCode: string, text: string, data: {
     status?: string;
