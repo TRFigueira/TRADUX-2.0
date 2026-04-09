@@ -49,15 +49,21 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   }, []);
 
   const loadTools = async () => {
+    console.log('[ToolsManager] Loading tools...');
     setLoading(true);
     try {
+      console.log('[ToolsManager] Calling toolsList...');
       const result = await window.electronAPI?.toolsList?.();
+      console.log('[ToolsManager] toolsList result:', result);
       if (result?.success) {
+        console.log('[ToolsManager] Tools loaded:', result.tools);
         setTools(result.tools);
       } else {
+        console.error('[ToolsManager] Failed to load tools:', result?.error);
         setError(result?.error || 'Failed to load tools');
       }
     } catch (err) {
+      console.error('[ToolsManager] Error loading tools:', err);
       setError((err as Error).message);
     } finally {
       setLoading(false);
