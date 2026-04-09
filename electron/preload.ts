@@ -419,7 +419,12 @@ const api: ElectronAPI = {
    * Listar ferramentas externas disponíveis e seu status.
    * @returns Lista de ferramentas com status de instalação
    */
-  toolsList: () => ipcRenderer.invoke('tools:list'),
+  toolsList: () => {
+    console.log('[Preload] toolsList called');
+    const result = ipcRenderer.invoke('tools:list');
+    console.log('[Preload] toolsList result:', result);
+    return result;
+  },
 
   /**
    * Instalar uma ferramenta específica.
