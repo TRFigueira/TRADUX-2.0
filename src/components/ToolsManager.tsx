@@ -19,7 +19,24 @@ interface ToolProgress {
 }
 
 export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const [tools, setTools] = useState<Tool[]>([]);
+  const [tools, setTools] = useState<Tool[]>([
+    {
+      name: 'AssetStudioCLI',
+      executableName: 'AssetStudioCLI_net6_win_x64.exe',
+      description: 'Extrai assets Unity (TextAsset, MonoBehaviour)',
+      installed: true,
+      version: 'v0.6.1',
+      path: 'C:\\Users\\Fortal Connect\\AppData\\Roaming\\tradux\\tools\\AssetStudioCLI_net6_win_x64.exe'
+    },
+    {
+      name: 'UABEA',
+      executableName: 'UABEAvalonia.exe',
+      description: 'Editor de assets Unity para modificação',
+      installed: true,
+      version: 'v2.0',
+      path: 'C:\\Users\\Fortal Connect\\AppData\\Roaming\\tradux\\tools\\UABEAvalonia.exe'
+    }
+  ]);
   const [loading, setLoading] = useState(false);
   const [installing, setInstalling] = useState<string | null>(null);
   const [progress, setProgress] = useState<ToolProgress | null>(null);
