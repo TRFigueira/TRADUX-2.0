@@ -103,6 +103,8 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     }
   };
 
+  console.log('[ToolsManager] Rendering modal, isOpen:', isOpen);
+  
   if (!isOpen) return null;
 
   return (
