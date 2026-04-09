@@ -61,14 +61,18 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       console.log('[ToolsManager] Checking window.electronAPI:', !!window.electronAPI);
       console.log('[ToolsManager] Checking toolsList method:', !!window.electronAPI?.toolsList);
       
-      if (!window.electronAPI?.toolsList) {
-        console.error('[ToolsManager] toolsList method not available');
+      // Try direct IPC call as fallback
+      const toolsListCall = window.electronAPI?.toolsList || 
+        (() => (window as any).ipcRenderer?.invoke?.('tools:list'));
+      
+      if (!toolsListCall) {
+        console.error('[ToolsManager] No toolsList method available');
         setError('API não disponível. Reinicie o aplicativo.');
         return;
       }
       
       console.log('[ToolsManager] Calling toolsList...');
-      const result = await window.electronAPI.toolsList();
+      const result = await toolsListCall();
       console.log('[ToolsManager] toolsList result:', result);
       if (result?.success) {
         console.log('[ToolsManager] Tools loaded:', result.tools);
