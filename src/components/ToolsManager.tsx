@@ -58,8 +58,17 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     console.log('[ToolsManager] Loading tools...');
     setLoading(true);
     try {
+      console.log('[ToolsManager] Checking window.electronAPI:', !!window.electronAPI);
+      console.log('[ToolsManager] Checking toolsList method:', !!window.electronAPI?.toolsList);
+      
+      if (!window.electronAPI?.toolsList) {
+        console.error('[ToolsManager] toolsList method not available');
+        setError('API não disponível. Reinicie o aplicativo.');
+        return;
+      }
+      
       console.log('[ToolsManager] Calling toolsList...');
-      const result = await window.electronAPI?.toolsList?.();
+      const result = await window.electronAPI.toolsList();
       console.log('[ToolsManager] toolsList result:', result);
       if (result?.success) {
         console.log('[ToolsManager] Tools loaded:', result.tools);
