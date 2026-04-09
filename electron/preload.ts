@@ -99,6 +99,17 @@ export interface ElectronAPI {
     failed: number;
   }) => void) => () => void;
   
+  // === TOOL MANAGEMENT ===
+  toolsList: () => Promise<{ success: boolean; tools: any[]; error?: string }>;
+  toolsInstall: (toolName: string) => Promise<{ success: boolean; error?: string }>;
+  onToolsProgress: (callback: (progress: {
+    toolName: string;
+    phase: string;
+    percentage: number;
+    message: string;
+    error?: string;
+  }) => void) => () => void;
+  
   // Selecionar e importar pasta com arquivos de tradução
   selectFolder: () => Promise<{
     canceled: boolean;
@@ -401,6 +412,31 @@ const api: ElectronAPI = {
     const handler = (_event: any, progress: any) => callback(progress);
     ipcRenderer.on('assetstudio-progress', handler);
     return () => ipcRenderer.removeListener('assetstudio-progress', handler);
+  },
+
+  // === TOOL MANAGEMENT ===
+  /**
+   * Listar ferramentas externas disponíveis e seu status.
+   * @returns Lista de ferramentas com status de instalação
+   */
+  toolsList: () => ipcRenderer.invoke('tools:list'),
+
+  /**
+   * Instalar uma ferramenta específica.
+   * @param toolName - Nome da ferramenta (AssetStudioCLI, UABEA)
+   * @returns Resultado da instalação
+   */
+  toolsInstall: (toolName: string) => ipcRenderer.invoke('tools:install', toolName),
+
+  /**
+   * Listener para progresso de instalação de ferramentas.
+   * @param callback - Função chamada quando há atualização
+   * @returns Função para remover o listener
+   */
+  onToolsProgress: (callback) => {
+    const handler = (_event: any, progress: any) => callback(progress);
+    ipcRenderer.on('tools:progress', handler);
+    return () => ipcRenderer.removeListener('tools:progress', handler);
   }
 };
 

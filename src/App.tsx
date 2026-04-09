@@ -5,7 +5,8 @@ import { ContextPanel } from './components/ContextPanel';
 import { ExportModal } from './components/ExportModal';
 import { ScanModal } from './components/ScanModal';
 import { ExtractionSettings } from './components/ExtractionSettings';
-import { Menu, Minus, Square, X, Download, Gamepad2, Trash2, Languages, Settings } from 'lucide-react';
+import { ToolsManager } from './components/ToolsManager';
+import { Menu, Minus, Square, X, Download, Gamepad2, Trash2, Languages, Settings, Wrench } from 'lucide-react';
 
 /**
  * Componente Principal App
@@ -61,6 +62,7 @@ function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [isExtractionSettingsOpen, setIsExtractionSettingsOpen] = useState(false);
+  const [isToolsManagerOpen, setIsToolsManagerOpen] = useState(false);
   const [loading, setLoading] = useState({
     files: false,
     strings: false,
@@ -431,6 +433,14 @@ function App() {
               <Settings className="w-3.5 h-3.5" />
               Configurações
             </button>
+            <button
+              onClick={() => setIsToolsManagerOpen(true)}
+              className="flex items-center gap-2 px-3 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-xs font-medium rounded transition-colors"
+              title="Gerenciar Ferramentas"
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              Ferramentas
+            </button>
             <div className="w-px h-4 bg-cat-dark-600" />
           <button className="p-1.5 hover:bg-cat-dark-700 rounded text-cat-dark-400 hover:text-cat-dark-200">
             <Minus className="w-4 h-4" />
@@ -511,6 +521,11 @@ function App() {
       <ExtractionSettings
         isOpen={isExtractionSettingsOpen}
         onClose={() => setIsExtractionSettingsOpen(false)}
+      />
+
+      <ToolsManager
+        isOpen={isToolsManagerOpen}
+        onClose={() => setIsToolsManagerOpen(false)}
       />
     </div>
   );

@@ -4,11 +4,13 @@ import fs from 'fs';
 import { spawn } from 'child_process';
 import { TraduxDatabase } from '../src/database/TraduxDatabase';
 import { processFile, TranslatableString } from './assetProcessors';
+import { ToolManager } from '../src/services/ToolManager';
 
 // Função principal de inicialização
 function initializeApp() {
   let mainWindow: BrowserWindow | null = null;
   let db: TraduxDatabase | null = null;
+  let toolManager: ToolManager | null = null;
 
   // Criar janela principal
   function createWindow() {
@@ -48,6 +50,11 @@ function initializeApp() {
       
       await db.initialize();
       console.log('[Main] Database initialized successfully');
+      
+      // Initialize ToolManager
+      const toolsDir = path.join(app.getPath('userData'), 'tools');
+      toolManager = new ToolManager(toolsDir);
+      console.log('[Main] ToolManager initialized');
     } catch (error) {
       console.error('[Main] Failed to initialize database:', error);
       throw error;
@@ -401,6 +408,46 @@ function initializeApp() {
         if (!db) throw new Error('Database not initialized');
         const value = db.getSetting(key);
         return { success: true, value };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    // === TOOL MANAGEMENT ===
+    ipcMain.handle('tools:list', async () => {
+      try {
+        if (!toolManager) throw new Error('ToolManager not initialized');
+        const tools = await toolManager.getTools();
+        return { success: true, tools };
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('tools:install', async (_event, toolName: string) => {
+      try {
+        if (!toolManager) throw new Error('ToolManager not initialized');
+        
+        // Forward progress events to renderer
+        toolManager.on('progress', (progress) => {
+          if (mainWindow) {
+            mainWindow.webContents.send('tools:progress', progress);
+          }
+        });
+        
+        const result = await toolManager.installTool(toolName);
+        return result;
+      } catch (error) {
+        return { success: false, error: (error as Error).message };
+      }
+    });
+
+    ipcMain.handle('tools:check', async (_event, toolName: string) => {
+      try {
+        if (!toolManager) throw new Error('ToolManager not initialized');
+        const isInstalled = toolManager.isInstalled(toolName);
+        const toolPath = toolManager.getToolPath(toolName);
+        return { success: true, installed: isInstalled, path: toolPath };
       } catch (error) {
         return { success: false, error: (error as Error).message };
       }
