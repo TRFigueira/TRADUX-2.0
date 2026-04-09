@@ -866,6 +866,11 @@ function initializeApp() {
       'Dialog',               // Alternative spelling
       'Scripts',              // Scripts with embedded text
       'Managed',              // .NET assemblies
+      '!2Language',           // Specific game language folder
+      'Main Dialogue DataBase', // Dialogue database folder
+      'DialogueDataBase',     // Alternative spelling
+      'Language',             // Single language folder
+      'DialogData',           // Dialogue data folder
     ];
     
     function walkDir(dir: string, relativePath: string = '') {
