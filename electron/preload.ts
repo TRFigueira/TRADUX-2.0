@@ -445,10 +445,10 @@ const api: ElectronAPI = {
   }
 };
 
-// Expor APIs ao contexto do Renderer via window.api
+// Expor APIs ao contexto do Renderer via window.electronAPI
 console.log('[Preload] Exposing API:', Object.keys(api));
-contextBridge.exposeInMainWorld('api', api);
-console.log('[Preload] API exposed to window.api');
+contextBridge.exposeInMainWorld('electronAPI', api);
+console.log('[Preload] API exposed to window.electronAPI');
 
 /**
  * Declaração de tipo para o ambiente global.
@@ -456,6 +456,6 @@ console.log('[Preload] API exposed to window.api');
  */
 declare global {
   interface Window {
-    api: ElectronAPI;
+    electronAPI: ElectronAPI;
   }
 }
