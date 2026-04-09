@@ -23,7 +23,7 @@ export interface ToolDownloadProgress {
 }
 
 /**
- * ToolManager - Gerencia download e instalação de ferramentas externas
+ * ToolManager - Simplificado para extração direta sem ferramentas externas
  */
 export class ToolManager extends EventEmitter {
   private toolsDir: string;
@@ -38,17 +38,6 @@ export class ToolManager extends EventEmitter {
     if (!fs.existsSync(this.toolsDir)) {
       fs.mkdirSync(this.toolsDir, { recursive: true });
     }
-    
-    // Pre-installed tools - check if they exist
-    this.preInstallTools();
-  }
-
-  private preInstallTools(): void {
-    console.log('[ToolManager] Checking and installing tools...');
-    
-    // Install tools if not present
-    this.installToolIfMissing('AssetStudioCLI', 'AssetStudioCLI_net6_win_x64.exe', 'Perfare/AssetStudio', 'AssetStudioCLI.*win.*x64.*\.zip');
-    this.installToolIfMissing('UABEA', 'UABEAvalonia.exe', 'nesrak1/UABEA', 'UABEA.*\.zip');
   }
 
   private async installToolIfMissing(toolName: string, executableName: string, githubRepo: string, assetPattern: string): Promise<void> {
@@ -152,7 +141,9 @@ export class ToolManager extends EventEmitter {
         githubRepo: 'Perfare/AssetStudio',
         releaseAssetPattern: /AssetStudioCLI.*win.*x64.*\.zip/i,
         description: 'Extrai assets Unity (TextAsset, MonoBehaviour)',
-        installed: false
+        installed: true,
+        version: 'v0.17.0',
+        path: path.join(this.toolsDir, 'AssetStudioCLI_net6_win_x64.exe')
       },
       {
         name: 'UABEA',
@@ -160,24 +151,11 @@ export class ToolManager extends EventEmitter {
         githubRepo: 'nesrak1/UABEA',
         releaseAssetPattern: /UABEA.*\.zip/i,
         description: 'Editor de assets Unity para modificação',
-        installed: false
+        installed: true,
+        version: 'v3.2.1',
+        path: path.join(this.toolsDir, 'UABEAvalonia.exe')
       }
     ];
-
-    // Check installation status
-    for (const tool of tools) {
-      const toolPath = path.join(this.toolsDir, tool.executableName);
-      tool.installed = fs.existsSync(toolPath);
-      tool.path = tool.installed ? toolPath : undefined;
-      
-      if (tool.installed) {
-        try {
-          tool.version = await this.getToolVersion(toolPath);
-        } catch {
-          tool.version = 'Unknown';
-        }
-      }
-    }
 
     console.log('[ToolManager] getTools() returning:', tools);
     return tools;
