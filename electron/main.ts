@@ -415,11 +415,20 @@ function initializeApp() {
 
     // === TOOL MANAGEMENT ===
     ipcMain.handle('tools:list', async () => {
+      console.log('[Main] tools:list handler called');
       try {
-        if (!toolManager) throw new Error('ToolManager not initialized');
+        if (!toolManager) {
+          console.error('[Main] ToolManager not initialized');
+          throw new Error('ToolManager not initialized');
+        }
+        console.log('[Main] Calling toolManager.getTools()...');
         const tools = await toolManager.getTools();
-        return { success: true, tools };
+        console.log('[Main] getTools result:', tools);
+        const result = { success: true, tools };
+        console.log('[Main] Returning result:', result);
+        return result;
       } catch (error) {
+        console.error('[Main] Error in tools:list:', error);
         return { success: false, error: (error as Error).message };
       }
     });
