@@ -74,15 +74,15 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
   useEffect(() => {
     if (!isOpen) return;
 
-    const removeScanListener = window.api.onScanProgress((p) => {
+    const removeScanListener = window.electronAPI?.onScanProgress?.((p) => {
       setProgress(p);
     });
 
-    const removeImportListener = window.api.onImportProgress((p) => {
+    const removeImportListener = window.electronAPI?.onImportProgress?.((p) => {
       // Progresso de importação
     });
 
-    const removeAssetStudioListener = window.api.onAssetStudioProgress((p) => {
+    const removeAssetStudioListener = window.electronAPI?.onAssetStudioProgress?.((p) => {
       setProgress(p);
     });
 
@@ -98,7 +98,7 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
 
   const checkAssetStudioStatus = async () => {
     try {
-      const status = await window.api.checkAssetStudio();
+      const status = await window.electronAPI.checkAssetStudio();
       setAssetStudioStatus(status);
       
       // Se UABEA estiver disponível, mostrar como instalado
@@ -113,7 +113,7 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
   const installAssetStudio = async () => {
     setIsInstallingAssetStudio(true);
     try {
-      const result = await window.api.installAssetStudio();
+      const result = await window.electronAPI.installAssetStudio();
       if (result.success) {
         // Mostrar instruções detalhadas
         alert(
@@ -150,7 +150,7 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
 
     try {
       // Primeiro, obter o caminho do jogo selecionado
-      const importResult = await window.api.importUnityGame();
+      const importResult = await window.electronAPI.importUnityGame();
       
       if (!importResult.success || !importResult.gamePath) {
         setError('Nenhuma pasta de jogo selecionada');
@@ -158,7 +158,7 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
       }
 
       // Agora fazer o scan com o caminho correto
-      const scanResult = await window.api.scanUnityGame(importResult.gamePath);
+      const scanResult = await window.electronAPI.scanUnityGame(importResult.gamePath);
       
       if (!scanResult.gamePath) {
         setError('Scan cancelado ou pasta inválida');
@@ -181,7 +181,7 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
       // Se não há arquivos traduzíveis, tentar scan de .assets com AssetStudio
       if (resultData.translatableFiles === 0 && assetStudioStatus?.available) {
         try {
-          const assetScanResult = await window.api.scanAssetsFilesAssetStudio(resultData.gamePath);
+          const assetScanResult = await window.electronAPI.scanAssetsFilesAssetStudio(resultData.gamePath);
           if (assetScanResult.success) {
             setAssetFiles(assetScanResult.files);
           }
@@ -219,7 +219,7 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
       }
       
       const filesToImport = result.files.filter(f => selectedFiles.has(f.path));
-      const importResult = await window.api.importScannedFiles(filesToImport);
+      const importResult = await window.electronAPI.importScannedFiles(filesToImport);
 
       if (importResult.success) {
         onImportComplete();
@@ -304,7 +304,7 @@ export function ScanModal({ isOpen, onClose, onImportComplete }: ScanModalProps)
 
     try {
       const filesToExtract = assetFiles.filter(f => selectedAssets.has(f.path));
-      const extractResult = await window.api.extractAssetsTextsAssetStudio(filesToExtract);
+      const extractResult = await window.electronAPI.extractAssetsTextsAssetStudio(filesToExtract);
 
       if (extractResult.success) {
         onImportComplete();
