@@ -44,6 +44,7 @@ export class ToolManager extends EventEmitter {
    * Lista todas as ferramentas disponíveis e seu status
    */
   async getTools(): Promise<ToolInfo[]> {
+    console.log('[ToolManager] getTools() called');
     const tools: ToolInfo[] = [
       {
         name: 'AssetStudioCLI',
@@ -78,6 +79,7 @@ export class ToolManager extends EventEmitter {
       }
     }
 
+    console.log('[ToolManager] getTools() returning:', tools);
     return tools;
   }
 
