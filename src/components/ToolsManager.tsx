@@ -82,16 +82,16 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-cat-dark-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
+      <div className="bg-gray-900 rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-cat-dark-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <div className="flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-cat-primary" />
-            <h2 className="text-lg font-semibold text-cat-light">Ferramentas Externas</h2>
+            <Wrench className="w-5 h-5 text-blue-500" />
+            <h2 className="text-lg font-semibold text-gray-100">Ferramentas Externas</h2>
           </div>
           <button
             onClick={onClose}
-            className="text-cat-dark-400 hover:text-cat-light transition-colors"
+            className="text-gray-400 hover:text-gray-100 transition-colors"
           >
             ✕
           </button>
@@ -106,40 +106,40 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             </div>
           )}
 
-          <p className="text-cat-dark-400 text-sm mb-4">
+          <p className="text-gray-400 text-sm mb-4">
             Estas ferramentas são necessárias para extrair textos de jogos Unity.
             Clique em "Instalar" para baixar automaticamente do GitHub.
           </p>
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-cat-primary" />
-              <span className="ml-2 text-cat-dark-400">Carregando...</span>
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+              <span className="ml-2 text-gray-400">Carregando...</span>
             </div>
           ) : (
             <div className="space-y-4">
               {tools.map((tool) => (
                 <div
                   key={tool.name}
-                  className="flex items-center justify-between p-4 bg-cat-dark-700/50 rounded-lg border border-cat-dark-600"
+                  className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-cat-light">{tool.name}</h3>
+                      <h3 className="font-medium text-gray-100">{tool.name}</h3>
                       {tool.installed ? (
                         <CheckCircle className="w-4 h-4 text-green-500" />
                       ) : (
                         <AlertCircle className="w-4 h-4 text-yellow-500" />
                       )}
                     </div>
-                    <p className="text-sm text-cat-dark-400 mt-1">{tool.description}</p>
+                    <p className="text-sm text-gray-400 mt-1">{tool.description}</p>
                     {tool.installed && tool.version && (
-                      <p className="text-xs text-cat-dark-500 mt-1">
+                      <p className="text-xs text-gray-500 mt-1">
                         Versão: {tool.version}
                       </p>
                     )}
                     {tool.installed && tool.path && (
-                      <p className="text-xs text-cat-dark-600 mt-0.5 truncate max-w-md">
+                      <p className="text-xs text-gray-600 mt-0.5 truncate max-w-md">
                         {tool.path}
                       </p>
                     )}
@@ -149,16 +149,16 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                     {installing === tool.name ? (
                       <div className="w-32">
                         <div className="flex items-center gap-2 mb-2">
-                          <Loader2 className="w-4 h-4 animate-spin text-cat-primary" />
-                          <span className="text-xs text-cat-dark-400">
+                          <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                          <span className="text-xs text-gray-400">
                             {progress?.phase === 'downloading' && 'Baixando...'}
                             {progress?.phase === 'extracting' && 'Extraindo...'}
                             {progress?.phase === 'installing' && 'Instalando...'}
                           </span>
                         </div>
-                        <div className="h-1.5 bg-cat-dark-600 rounded-full overflow-hidden">
+                        <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-cat-primary transition-all duration-300"
+                            className="h-full bg-blue-500 transition-all duration-300"
                             style={{ width: `${progress?.percentage || 0}%` }}
                           />
                         </div>
@@ -174,7 +174,7 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                     ) : (
                       <button
                         onClick={() => installTool(tool.name)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-cat-primary hover:bg-cat-primary/80 text-cat-dark-900 text-sm font-medium rounded transition-colors"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded transition-colors"
                       >
                         <Download className="w-4 h-4" />
                         Instalar
@@ -191,7 +191,7 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
             <h4 className="text-sm font-medium text-blue-400 mb-2">
               Sobre as Ferramentas
             </h4>
-            <ul className="text-xs text-cat-dark-400 space-y-1">
+            <ul className="text-xs text-gray-400 space-y-1">
               <li>
                 <strong>AssetStudioCLI:</strong> Extrai assets Unity (TextAsset, MonoBehaviour) de jogos Unity. 
                 Essencial para extrair textos de diálogos, menus e UI.
@@ -205,17 +205,17 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 p-4 border-t border-cat-dark-700 bg-cat-dark-800">
+        <div className="flex justify-end gap-2 p-4 border-t border-gray-700 bg-gray-900">
           <button
             onClick={loadTools}
             disabled={loading}
-            className="px-4 py-2 text-sm text-cat-dark-400 hover:text-cat-light transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm text-gray-400 hover:text-gray-100 transition-colors disabled:opacity-50"
           >
             Atualizar
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-cat-dark-700 hover:bg-cat-dark-600 text-cat-light text-sm rounded transition-colors"
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-100 text-sm rounded transition-colors"
           >
             Fechar
           </button>
