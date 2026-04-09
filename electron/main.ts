@@ -968,6 +968,12 @@ function initializeApp() {
     console.log(`[Scan] Encontrados ${files.length} arquivos candidatos`);
     console.log(`[Scan] Top 10 por prioridade:`, files.slice(0, 10).map(f => `${f.name} (prio:${f.priority})`));
     
+    if (files.length === 0) {
+      console.log('[Scan] WARNING: Nenhum arquivo traduzível encontrado!');
+      console.log('[Scan] Verificando se o diretório existe:', fs.existsSync(gamePath));
+      console.log('[Scan] Conteúdo do diretório:', fs.existsSync(gamePath) ? fs.readdirSync(gamePath).slice(0, 20) : 'N/A');
+    }
+    
     return files;
   }
 
