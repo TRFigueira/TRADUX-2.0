@@ -61,18 +61,25 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       console.log('[ToolsManager] Checking window.electronAPI:', !!window.electronAPI);
       console.log('[ToolsManager] Checking toolsList method:', !!window.electronAPI?.toolsList);
       
-      // Try direct IPC call as fallback
-      const toolsListCall = window.electronAPI?.toolsList || 
-        (() => (window as any).ipcRenderer?.invoke?.('tools:list'));
-      
-      if (!toolsListCall) {
-        console.error('[ToolsManager] No toolsList method available');
-        setError('API não disponível. Reinicie o aplicativo.');
+      // Try direct IPC call
+      let result;
+      try {
+        if (window.electronAPI?.toolsList) {
+          console.log('[ToolsManager] Using window.electronAPI.toolsList');
+          result = await window.electronAPI.toolsList();
+        } else if ((window as any).ipcRenderer?.invoke) {
+          console.log('[ToolsManager] Using direct ipcRenderer.invoke');
+          result = await (window as any).ipcRenderer.invoke('tools:list');
+        } else {
+          console.error('[ToolsManager] No IPC method available');
+          setError('API não disponível. Reinicie o aplicativo.');
+          return;
+        }
+      } catch (err) {
+        console.error('[ToolsManager] IPC call failed:', err);
+        setError('Erro de comunicação: ' + (err as Error).message);
         return;
       }
-      
-      console.log('[ToolsManager] Calling toolsList...');
-      const result = await toolsListCall();
       console.log('[ToolsManager] toolsList result:', result);
       if (result?.success) {
         console.log('[ToolsManager] Tools loaded:', result.tools);
