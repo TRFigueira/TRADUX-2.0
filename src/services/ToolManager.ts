@@ -38,6 +38,106 @@ export class ToolManager extends EventEmitter {
     if (!fs.existsSync(this.toolsDir)) {
       fs.mkdirSync(this.toolsDir, { recursive: true });
     }
+    
+    // Pre-installed tools - check if they exist
+    this.preInstallTools();
+  }
+
+  private preInstallTools(): void {
+    console.log('[ToolManager] Checking and installing tools...');
+    
+    // Install tools if not present
+    this.installToolIfMissing('AssetStudioCLI', 'AssetStudioCLI_net6_win_x64.exe', 'Perfare/AssetStudio', 'AssetStudioCLI.*win.*x64.*\.zip');
+    this.installToolIfMissing('UABEA', 'UABEAvalonia.exe', 'nesrak1/UABEA', 'UABEA.*\.zip');
+  }
+
+  private async installToolIfMissing(toolName: string, executableName: string, githubRepo: string, assetPattern: string): Promise<void> {
+    const toolPath = path.join(this.toolsDir, executableName);
+    
+    if (fs.existsSync(toolPath)) {
+      console.log(`[ToolManager] ${toolName} already exists at ${toolPath}`);
+      return;
+    }
+    
+    console.log(`[ToolManager] Installing ${toolName} automatically...`);
+    
+    try {
+      // Fetch latest release
+      const releaseUrl = `https://api.github.com/repos/${githubRepo}/releases/latest`;
+      console.log(`[ToolManager] Fetching release from: ${releaseUrl}`);
+      
+      const response = await fetch(releaseUrl, {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'TRADUX-ToolManager'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch release: ${response.status}`);
+      }
+      
+      const release = await response.json();
+      console.log(`[ToolManager] Release info:`, release.tag_name);
+      
+      // Find matching asset
+      const asset = release.assets.find((a: any) => 
+        new RegExp(assetPattern, 'i').test(a.name)
+      );
+      
+      if (!asset) {
+        throw new Error(`No suitable asset found for ${toolName}`);
+      }
+      
+      console.log(`[ToolManager] Found asset: ${asset.name} (${asset.size} bytes)`);
+      
+      // Download and extract
+      await this.downloadAndExtract(asset.browser_download_url, toolPath, toolName);
+      
+      console.log(`[ToolManager] ${toolName} installed successfully!`);
+      
+    } catch (error) {
+      console.error(`[ToolManager] Failed to install ${toolName}:`, error);
+      // Create placeholder as fallback
+      fs.writeFileSync(toolPath, `# Installation failed: ${(error as Error).message}`);
+    }
+  }
+
+  private async downloadAndExtract(downloadUrl: string, toolPath: string, toolName: string): Promise<void> {
+    console.log(`[ToolManager] Downloading ${toolName} from ${downloadUrl}`);
+    
+    // Download file
+    const response = await fetch(downloadUrl);
+    if (!response.ok) {
+      throw new Error(`Download failed: ${response.status}`);
+    }
+    
+    const buffer = await response.arrayBuffer();
+    const zipPath = toolPath + '.zip';
+    
+    // Save ZIP
+    fs.writeFileSync(zipPath, Buffer.from(buffer));
+    
+    // Extract using PowerShell
+    await new Promise<void>((resolve, reject) => {
+      const { spawn } = require('child_process');
+      const ps = spawn('powershell', [
+        '-Command',
+        `Expand-Archive -Path "${zipPath}" -DestinationPath "${path.dirname(toolPath)}" -Force`
+      ]);
+      
+      ps.on('close', (code) => {
+        if (code === 0) {
+          // Clean up ZIP
+          fs.unlinkSync(zipPath);
+          resolve();
+        } else {
+          reject(new Error(`Extraction failed with code ${code}`));
+        }
+      });
+      
+      ps.on('error', reject);
+    });
   }
 
   /**
