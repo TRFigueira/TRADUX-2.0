@@ -112,7 +112,7 @@ function App() {
   const loadFiles = async () => {
     setLoading(prev => ({ ...prev, files: true }));
     try {
-      const fileList = await window.api.fetchFiles();
+      const fileList = await window.electronAPI?.fetchFiles?.();
       setFiles(fileList);
       
       // Calcular estatísticas globais
@@ -134,7 +134,7 @@ function App() {
   const loadStrings = async (fileId: string, page: number = 1, pageSize: number = 1000) => {
     setLoading(prev => ({ ...prev, strings: true }));
     try {
-      const result = await window.api.fetchStringsByFile(fileId, page, pageSize);
+      const result = await window.electronAPI.fetchStringsByFile(fileId, page, pageSize);
       
       // Handle both old format (array) and new format (object with pagination)
       const stringList = Array.isArray(result) ? result : result.strings;
@@ -163,7 +163,7 @@ function App() {
   const loadFuzzyMatches = async (query: string) => {
     setLoading(prev => ({ ...prev, fuzzy: true }));
     try {
-      const matches = await window.api.searchFuzzy(query, 5);
+      const matches = await window.electronAPI.searchFuzzy(query, 5);
       setFuzzyMatches(matches.map(m => ({
         ...m,
         similarity: 1 - (m.rank * 0.1) // Converter rank para similaridade aproximada
@@ -181,7 +181,7 @@ function App() {
   const loadQACheck = async (id: number) => {
     setLoading(prev => ({ ...prev, qa: true }));
     try {
-      const result = await window.api.runQACheck(id);
+      const result = await window.electronAPI.runQACheck(id);
       setQaResult(result);
     } catch (error) {
       console.error('Erro no QA:', error);
@@ -195,7 +195,7 @@ function App() {
    */
   const handleSaveTranslation = useCallback(async (id: number, text: string) => {
     try {
-      await window.api.translateString(id, text);
+      await window.electronAPI.translateString(id, text);
       
       // Atualizar estado local
       setStrings(prev => prev.map(s => 
@@ -260,7 +260,7 @@ function App() {
    */
   const handleAddFolder = useCallback(async () => {
     try {
-      const result = await window.api.selectFolder();
+      const result = await window.electronAPI.selectFolder();
       
       if (result.canceled) {
         console.log('Importação cancelada pelo usuário');
@@ -303,7 +303,7 @@ function App() {
     }
     
     try {
-      const result = await window.api.deleteStringsByFile(selectedFile);
+      const result = await window.electronAPI.deleteStringsByFile(selectedFile);
       if (result.success) {
         alert(`${result.deletedCount} strings deletadas de ${selectedFile}`);
         setSelectedFile(null);
@@ -327,7 +327,7 @@ function App() {
     }
     
     try {
-      const result = await window.api.clearAllStrings();
+      const result = await window.electronAPI.clearAllStrings();
       if (result.success) {
         alert(`${result.deletedCount} strings deletadas do banco de dados`);
         setSelectedFile(null);
@@ -352,7 +352,7 @@ function App() {
     }
     
     try {
-      const result = await window.api.translateAll('pt-BR');
+      const result = await window.electronAPI.translateAll('pt-BR');
       if (result.success) {
         alert(`${result.translatedCount} strings traduzidas!\n\n${result.message || ''}`);
         if (selectedFile) {
