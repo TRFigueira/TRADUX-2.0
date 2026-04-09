@@ -32,8 +32,10 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   }, [isOpen]);
 
   useEffect(() => {
+    console.log('[ToolsManager] Setting up progress listener...');
     // Listen for progress updates
     const unsubscribe = window.electronAPI?.onToolsProgress?.((data: ToolProgress) => {
+      console.log('[ToolsManager] Progress update:', data);
       setProgress(data);
       if (data.phase === 'complete' || data.phase === 'error') {
         setInstalling(null);
@@ -43,8 +45,12 @@ export function ToolsManager({ isOpen, onClose }: { isOpen: boolean; onClose: ()
       }
     });
 
+    console.log('[ToolsManager] Progress listener set up:', !!unsubscribe);
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribe) {
+        console.log('[ToolsManager] Cleaning up progress listener');
+        unsubscribe();
+      }
     };
   }, []);
 
