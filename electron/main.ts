@@ -65,11 +65,19 @@ function initializeApp() {
   async function extractWithAssetStudioCLI(gamePath: string): Promise<Array<{path_id: string; original_text: string; assetFile: string}>> {
     const strings: Array<{path_id: string; original_text: string; assetFile: string}> = [];
     
-    const assetStudioPath = path.join(app.getPath('userData'), 'tools', 'AssetStudioCLI_net6_win_x64.exe');
-    
-    // Check if AssetStudioCLI exists
-    if (!fs.existsSync(assetStudioPath)) {
-      console.log('[AssetStudio] CLI not found, falling back to manual extraction');
+    // Check if AssetStudioCLI exists using tool manager
+    const assetStudioPath = toolManager?.getToolPath('AssetStudioCLI');
+    if (!assetStudioPath || !fs.existsSync(assetStudioPath)) {
+      console.log('[AssetStudio] CLI not found, trying UABEA or falling back to manual extraction');
+      
+      // Try UABEA as fallback
+      const uabeaPath = toolManager?.getToolPath('UABEA');
+      if (uabeaPath && fs.existsSync(uabeaPath)) {
+        console.log('[AssetStudio] Using UABEA as fallback');
+        // UABEA extraction logic would go here
+        return strings;
+      }
+      
       return strings;
     }
     
